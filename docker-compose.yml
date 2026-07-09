@@ -1,0 +1,41 @@
+name: uzlab
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: uzlab
+      POSTGRES_PASSWORD: uzlab_dev_password
+      POSTGRES_DB: uzlab
+    ports:
+      - "5432:5432"
+    volumes:
+      - uzlab_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U uzlab"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: uzlab_minio
+      MINIO_ROOT_PASSWORD: uzlab_minio_password
+    ports:
+      - "9000:9000" # S3 API
+      - "9001:9001" # web console
+    volumes:
+      - uzlab_minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  uzlab_postgres_data:
+  uzlab_minio_data:

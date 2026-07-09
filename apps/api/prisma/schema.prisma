@@ -1,0 +1,182 @@
+// UzLab core schema — v1 (MVP) models only.
+// Deferred modules (Technical Committee, Equipment, Career, Professional
+// Development) are NOT modeled here yet — see docs/ARCHITECTURE.md for how
+// they plug in later without touching these tables.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// --- Auth & identity -------------------------------------------------
+
+enum UserRole {
+  ADMIN
+  STAFF
+  MEMBER
+  APPLICANT
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  passwordHash  String
+  fullName      String
+  role          UserRole @default(APPLICANT)
+  emailVerified Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+
+  refreshTokens        RefreshToken[]
+  member                Member?
+  membershipApplications MembershipApplication[]
+  contactSubmissions    ContactSubmission[]
+
+  @@index([deletedAt])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// --- Membership --------------------------------------------------------
+
+enum MembershipApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model MembershipType {
+  id          String  @id @default(uuid())
+  name        String  @unique
+  slug        String  @unique
+  description String
+  priceCents  Int
+  currency    String  @default("UZS")
+  durationDays Int
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  applications MembershipApplication[]
+  members      Member[]
+}
+
+model MembershipApplication {
+  id               String                       @id @default(uuid())
+  applicantUserId  String
+  applicant        User                         @relation(fields: [applicantUserId], references: [id])
+  membershipTypeId String
+  membershipType   MembershipType               @relation(fields: [membershipTypeId], references: [id])
+  status           MembershipApplicationStatus  @default(PENDING)
+  organization     String?
+  phone            String
+  notes            String?
+  reviewedByUserId String?
+  reviewedAt       DateTime?
+  createdAt        DateTime                     @default(now())
+  updatedAt        DateTime                     @updatedAt
+
+  @@index([status])
+}
+
+model Member {
+  id               String         @id @default(uuid())
+  userId           String         @unique
+  user             User           @relation(fields: [userId], references: [id])
+  membershipTypeId String
+  membershipType   MembershipType @relation(fields: [membershipTypeId], references: [id])
+  organization     String?
+  isDirectoryListed Boolean       @default(true)
+  memberSince      DateTime       @default(now())
+  expiresAt        DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@index([isDirectoryListed])
+}
+
+// --- Publications & Resources -------------------------------------------
+
+enum PublicationCategory {
+  COOKBOOK
+  LEGISLATIVE
+  INTERNATIONAL_LITERATURE
+}
+
+model Publication {
+  id           String              @id @default(uuid())
+  title        String
+  slug         String              @unique
+  category     PublicationCategory
+  summary      String
+  bodyText     String              // plain-text content used for search indexing
+  fileUrl      String?             // object storage key, if a document is attached
+  language     String              @default("uz")
+  tags         String[]            @default([])
+  author       String?
+  publishedAt  DateTime?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  deletedAt    DateTime?
+
+  @@index([category])
+  @@index([publishedAt])
+  @@index([deletedAt])
+}
+
+// --- Media & Contact -----------------------------------------------------
+
+model NewsArticle {
+  id            String   @id @default(uuid())
+  title         String
+  slug          String   @unique
+  summary       String
+  bodyText      String
+  coverImageUrl String?
+  publishedAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+
+  @@index([publishedAt])
+  @@index([deletedAt])
+}
+
+enum ContactSubmissionType {
+  CONTACT
+  FEEDBACK
+}
+
+enum ContactSubmissionStatus {
+  NEW
+  IN_REVIEW
+  RESOLVED
+}
+
+model ContactSubmission {
+  id        String                   @id @default(uuid())
+  type      ContactSubmissionType
+  name      String
+  email     String
+  message   String
+  status    ContactSubmissionStatus  @default(NEW)
+  userId    String?
+  user      User?                    @relation(fields: [userId], references: [id])
+  createdAt DateTime                 @default(now())
+
+  @@index([status])
+}
