@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SearchBar } from "@/components/SearchBar";
+import { EmptyStateSection } from "@/components/EmptyStateSection";
 import { api } from "@/lib/api";
 
 interface NewsArticle {
@@ -66,6 +67,13 @@ export default async function Home() {
             ))}
           </ul>
         )}
+      </section>
+
+      <section className="mx-auto max-w-4xl px-6 pb-16">
+        <EmptyStateSection
+          title="Upcoming events"
+          emptyMessage="No upcoming events scheduled yet."
+        />
       </section>
     </div>
   );

@@ -85,9 +85,10 @@ export default function ContactPage() {
 
         <div>
           <h2 className="text-lg font-semibold">Find us</h2>
-          <p className="mt-2 text-sm text-black/60 dark:text-white/60">
-            Address and map details coming soon.
-          </p>
+          <p className="mt-2 text-sm text-black/60 dark:text-white/60">Address coming soon.</p>
+          <div className="mt-4 flex aspect-video items-center justify-center rounded-lg border border-dashed border-black/15 text-sm text-black/40 dark:border-white/20 dark:text-white/40">
+            Map placeholder
+          </div>
         </div>
       </div>
     </div>

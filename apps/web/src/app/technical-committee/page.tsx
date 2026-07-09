@@ -4,7 +4,7 @@ export default function TechnicalCommitteePage() {
   return (
     <ComingSoon
       title="Technical Committee"
-      description="Technical committee functions and resources will be available here."
+      description="This module will grow to host several committee-specific functions and resources. Architecture reserved for future additions without restructuring."
     />
   );
 }
