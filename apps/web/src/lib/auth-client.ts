@@ -37,3 +37,7 @@ export function clearSession() {
   localStorage.removeItem(REFRESH_KEY);
   localStorage.removeItem(USER_KEY);
 }
+
+export function isStaff(user: StoredUser | null): boolean {
+  return user?.role === "ADMIN" || user?.role === "STAFF";
+}

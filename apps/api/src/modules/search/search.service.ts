@@ -81,7 +81,10 @@ export class SearchService {
         filters.tags && filters.tags.length > 0
           ? { hasSome: filters.tags }
           : undefined,
-      publishedAt: this.dateRange(filters.dateFrom, filters.dateTo),
+      publishedAt: {
+        not: null,
+        ...this.dateRange(filters.dateFrom, filters.dateTo),
+      },
       ...(q && {
         OR: [
           { title: { contains: q, mode: 'insensitive' } },
