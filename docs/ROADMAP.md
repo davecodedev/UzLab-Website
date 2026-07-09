@@ -41,51 +41,44 @@ publications, or news short of direct DB access. That's Week 2's first job.
 
 ---
 
-## Week 2 — Admin capability + content operations
+## Week 2 — Admin capability + content operations (done, one item carried forward)
 
 **Goal**: staff can run the site without a developer touching the database.
 
-**Backend track**
-- Day 1: `@Roles(UserRole.ADMIN, UserRole.STAFF)`-gated CRUD endpoints —
-  `MembershipType`, `Publication`, `NewsArticle`. Seed script that creates
-  one initial `ADMIN` user from env vars (`ADMIN_EMAIL`/`ADMIN_PASSWORD`),
-  so there's a bootstrap path into the admin area on a fresh deploy.
-- Day 2: Membership application review — `PATCH /membership/applications/:id`
-  (approve/reject, `ADMIN`/`STAFF` only). Approval creates the `Member`
-  record in the same transaction; rejection just updates status. Notify the
-  applicant (email — reuse whatever transactional email choice Week 2 also
-  needs for registration, don't build two).
-- Day 3: Publication file upload — wire the existing `fileUrl` field to
-  MinIO/S3 (`@aws-sdk/client-s3`, presigned upload from the admin UI or a
-  direct multipart endpoint — pick whichever is less code, this isn't a
-  place to over-engineer). Contact/feedback submissions: `GET
-  /contact/submissions` and a status-update endpoint, staff-only.
-- Day 4-5: buffer for whatever Day 1-3 actually took — file upload UX
-  (presigned vs. direct) is the most likely thing to run long.
+**Delivered**:
+- Role-gated (`ADMIN`/`STAFF`) CRUD for `MembershipType`, `Publication`,
+  `NewsArticle`, with a bootstrap seed script (`npm run seed:admin`,
+  idempotent — safe to run on every deploy)
+- Membership application review — approve creates the `Member` record and
+  upgrades the applicant's role in one transaction; reject just records the
+  decision; double-approval is blocked. Verified end-to-end.
+- Contact/feedback submissions: staff-only list + status updates
+- Minimal admin UI (`/admin/*`): role-gated layout, list+create for each
+  content type, application review screen, contact inbox — verified live
+  in the browser, not just via curl
 
-**Frontend track**
-- Day 1-2: Admin shell — a `/admin` route group, gated client-side by role
-  (redirect non-staff), listing/create/edit forms for MembershipType,
-  Publication, NewsArticle. Keep it plain — table + form, no design system
-  work here.
-- Day 3: Membership application review screen (list pending, approve/reject
-  buttons).
-- Day 4: Publication file upload UI, contact submissions inbox view.
-- Day 5: buffer / bug-fix from backend integration.
+**Two real bugs found and fixed while building this** (see git history for
+detail): a global `RolesGuard` that ran before `JwtAuthGuard` and made every
+role-gated route unconditionally 403; and Publications/News having no
+draft/published distinction on public read paths, so unpublished drafts
+were publicly visible. Both are the kind of bug that only surfaces when you
+actually exercise the endpoint end-to-end, not when you read the code —
+worth remembering as a reason the verification step in CLAUDE.md isn't
+optional.
 
-**If time runs short**: cut the admin UI polish before cutting the API
-endpoints. Staff can operate through `prisma studio` or raw API calls
-(documented in CLAUDE.md) for another week if genuinely necessary — but say
-so explicitly to the team, don't let it slip silently.
+**Not done, carried into Week 3**: Publication file upload to MinIO/S3
+(`fileUrl` field exists in the schema but nothing writes to it yet, and
+there's no upload UI). Applicant email notification on
+approval/rejection — no transactional email provider chosen yet.
 
-**Exit criteria for Week 2** (all must be true before Week 3 starts):
-- [ ] An admin can log in and create a membership type, a publication, and
+**Exit criteria for Week 2**:
+- [x] An admin can log in and create a membership type, a publication, and
       a news article without touching the database.
-- [ ] An admin can approve a pending membership application and the
+- [x] An admin can approve a pending membership application and the
       applicant becomes a listed `Member`.
 - [ ] A publication with an uploaded file downloads correctly from the
-      public site.
-- [ ] Contact/feedback submissions are visible to staff.
+      public site. — **carried to Week 3**
+- [x] Contact/feedback submissions are visible to staff.
 
 ---
 
@@ -99,6 +92,10 @@ this week depends on it. If it's not resolved by end of Day 1, escalate —
 don't let the team sit idle waiting on it.
 
 **Backend/Infra track**
+- Day 1 (parallel with the hosting conversation): finish the carried-over
+  Week 2 item — publication file upload wired to MinIO/S3, and applicant
+  notification email on membership approval/rejection (pick a
+  transactional email provider now, this blocks both).
 - Day 2: Dockerfiles for `apps/api` and `apps/web` (multi-stage, matching
   whatever base image the chosen hosting expects).
 - Day 3: CI extended — build + push images on merge to `main`, deploy to a
