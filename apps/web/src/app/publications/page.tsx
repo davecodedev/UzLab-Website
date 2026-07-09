@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SearchFiltersForm } from "@/components/SearchFiltersForm";
 import { api } from "@/lib/api";
 
 interface Publication {
@@ -8,12 +9,28 @@ interface Publication {
   category: string;
   summary: string;
   language: string;
+  author: string | null;
+  tags: string[];
 }
 
-async function getPublications(q?: string): Promise<Publication[]> {
+type PublicationsSearchParams = {
+  q?: string;
+  category?: string;
+  language?: string;
+  author?: string;
+  tags?: string;
+  dateFrom?: string;
+  dateTo?: string;
+};
+
+async function getPublications(params: PublicationsSearchParams): Promise<Publication[]> {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value) query.set(key, value);
+  }
+  const qs = query.toString();
   try {
-    const query = q ? `?q=${encodeURIComponent(q)}` : "";
-    return await api.get<Publication[]>(`/publications${query}`);
+    return await api.get<Publication[]>(`/publications${qs ? `?${qs}` : ""}`);
   } catch {
     return [];
   }
@@ -22,10 +39,10 @@ async function getPublications(q?: string): Promise<Publication[]> {
 export default async function PublicationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<PublicationsSearchParams>;
 }) {
-  const { q } = await searchParams;
-  const publications = await getPublications(q);
+  const params = await searchParams;
+  const publications = await getPublications(params);
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-16">
@@ -34,20 +51,9 @@ export default async function PublicationsPage({
         Cookbook, legislative documents, and international literature.
       </p>
 
-      <form className="mt-8 flex gap-2" action="/publications">
-        <input
-          name="q"
-          defaultValue={q ?? ""}
-          placeholder="Search publications…"
-          className="w-full rounded-md border border-black/15 px-3 py-2 text-sm dark:border-white/20 dark:bg-transparent"
-        />
-        <button
-          type="submit"
-          className="rounded-md bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
-        >
-          Search
-        </button>
-      </form>
+      <div className="mt-8">
+        <SearchFiltersForm action="/publications" values={params} />
+      </div>
 
       {publications.length === 0 ? (
         <p className="mt-8 text-sm text-black/60 dark:text-white/60">No publications found.</p>
@@ -60,7 +66,10 @@ export default async function PublicationsPage({
               </Link>
               <p className="mt-1 text-sm text-black/60 dark:text-white/60">{pub.summary}</p>
               <p className="mt-1 text-xs uppercase tracking-wide text-black/40 dark:text-white/40">
-                {pub.category.replace(/_/g, " ")} · {pub.language}
+                {[pub.category.replace(/_/g, " "), pub.language, pub.author]
+                  .filter(Boolean)
+                  .join(" · ")}
+                {pub.tags.length > 0 ? ` · ${pub.tags.join(", ")}` : ""}
               </p>
             </li>
           ))}

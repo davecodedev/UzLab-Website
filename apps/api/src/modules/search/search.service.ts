@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
+import { SearchQueryDto, SearchResultType } from './dto/search-query.dto.js';
 
 export interface SearchResultItem {
   type: 'publication' | 'news' | 'member';
@@ -7,76 +9,168 @@ export interface SearchResultItem {
   title: string;
   summary: string;
   url: string;
+  category?: string;
+  language?: string;
+  tags?: string[];
+  author?: string | null;
+  publishedAt?: string | null;
 }
 
-// v1 global search: queries each content type directly with ILIKE.
-// When result volume grows, swap the query layer below for a dedicated
-// search engine (Typesense/Meilisearch) behind this same method signature —
-// callers (the controller, and eventually the web app) don't need to change.
+const RESULTS_PER_TYPE = 20;
+
+// v1 global search: queries each content type directly against Postgres,
+// fanned out in parallel and merged. When result volume grows, swap the
+// query layer below for a dedicated search engine (Typesense/Meilisearch)
+// behind this same search(query) method signature — callers (the
+// controller, and the web app) don't need to change.
 @Injectable()
 export class SearchService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async search(q: string): Promise<SearchResultItem[]> {
-    if (!q || q.trim().length < 2) {
+  async search(query: SearchQueryDto): Promise<SearchResultItem[]> {
+    const q = query.q?.trim();
+    const hasKeyword = !!q && q.length >= 2;
+    const hasAnyFilter =
+      hasKeyword ||
+      !!query.category ||
+      !!query.language ||
+      !!query.author ||
+      (query.tags && query.tags.length > 0) ||
+      !!query.dateFrom ||
+      !!query.dateTo;
+
+    if (!hasAnyFilter) {
       return [];
     }
 
+    const wantsType = (type: SearchResultType) =>
+      !query.type || query.type === type;
+    // category/language/tags/author only apply to Publications — if one of
+    // those is the *only* filter set, News/Members have nothing to match
+    // against and must return empty rather than "everything".
+    const hasNewsApplicableFilter =
+      hasKeyword || !!query.dateFrom || !!query.dateTo;
+
     const [publications, news, members] = await Promise.all([
-      this.prisma.publication.findMany({
-        where: {
-          deletedAt: null,
-          OR: [
-            { title: { contains: q, mode: 'insensitive' } },
-            { summary: { contains: q, mode: 'insensitive' } },
-            { tags: { has: q } },
-          ],
-        },
-        take: 20,
-      }),
-      this.prisma.newsArticle.findMany({
-        where: {
-          deletedAt: null,
-          publishedAt: { not: null },
-          OR: [
-            { title: { contains: q, mode: 'insensitive' } },
-            { summary: { contains: q, mode: 'insensitive' } },
-          ],
-        },
-        take: 20,
-      }),
-      this.prisma.member.findMany({
-        where: {
-          isDirectoryListed: true,
-          user: { fullName: { contains: q, mode: 'insensitive' } },
-        },
-        include: { user: { select: { fullName: true } } },
-        take: 20,
-      }),
+      wantsType(SearchResultType.PUBLICATION)
+        ? this.searchPublications(q, query)
+        : Promise.resolve([]),
+      wantsType(SearchResultType.NEWS) && hasNewsApplicableFilter
+        ? this.searchNews(q, query)
+        : Promise.resolve([]),
+      wantsType(SearchResultType.MEMBER) && hasKeyword
+        ? this.searchMembers(q)
+        : Promise.resolve([]),
     ]);
 
-    return [
-      ...publications.map((p): SearchResultItem => ({
-        type: 'publication',
-        id: p.id,
-        title: p.title,
-        summary: p.summary,
-        url: `/publications/${p.slug}`,
-      })),
-      ...news.map((n): SearchResultItem => ({
-        type: 'news',
-        id: n.id,
-        title: n.title,
-        summary: n.summary,
-        url: `/news/${n.slug}`,
-      })),
-      ...members.map((m): SearchResultItem => ({
-        type: 'member',
-        id: m.id,
-        title: m.user.fullName,
-        summary: m.organization ?? '',
-        url: `/membership/directory/${m.id}`,
-      })),
-    ];
+    return [...publications, ...news, ...members];
+  }
+
+  private async searchPublications(
+    q: string | undefined,
+    filters: SearchQueryDto,
+  ): Promise<SearchResultItem[]> {
+    const where: Prisma.PublicationWhereInput = {
+      deletedAt: null,
+      category: filters.category,
+      language: filters.language,
+      author: filters.author
+        ? { contains: filters.author, mode: 'insensitive' }
+        : undefined,
+      tags:
+        filters.tags && filters.tags.length > 0
+          ? { hasSome: filters.tags }
+          : undefined,
+      publishedAt: this.dateRange(filters.dateFrom, filters.dateTo),
+      ...(q && {
+        OR: [
+          { title: { contains: q, mode: 'insensitive' } },
+          { summary: { contains: q, mode: 'insensitive' } },
+          { bodyText: { contains: q, mode: 'insensitive' } },
+          { tags: { has: q } },
+        ],
+      }),
+    };
+
+    const results = await this.prisma.publication.findMany({
+      where,
+      take: RESULTS_PER_TYPE,
+    });
+
+    return results.map((p) => ({
+      type: 'publication',
+      id: p.id,
+      title: p.title,
+      summary: p.summary,
+      url: `/publications/${p.slug}`,
+      category: p.category,
+      language: p.language,
+      tags: p.tags,
+      author: p.author,
+      publishedAt: p.publishedAt?.toISOString() ?? null,
+    }));
+  }
+
+  private async searchNews(
+    q: string | undefined,
+    filters: SearchQueryDto,
+  ): Promise<SearchResultItem[]> {
+    const where: Prisma.NewsArticleWhereInput = {
+      deletedAt: null,
+      publishedAt: {
+        not: null,
+        ...this.dateRange(filters.dateFrom, filters.dateTo),
+      },
+      ...(q && {
+        OR: [
+          { title: { contains: q, mode: 'insensitive' } },
+          { summary: { contains: q, mode: 'insensitive' } },
+        ],
+      }),
+    };
+
+    const results = await this.prisma.newsArticle.findMany({
+      where,
+      take: RESULTS_PER_TYPE,
+    });
+
+    return results.map((n) => ({
+      type: 'news',
+      id: n.id,
+      title: n.title,
+      summary: n.summary,
+      url: `/news/${n.slug}`,
+      publishedAt: n.publishedAt?.toISOString() ?? null,
+    }));
+  }
+
+  private async searchMembers(q: string): Promise<SearchResultItem[]> {
+    const results = await this.prisma.member.findMany({
+      where: {
+        isDirectoryListed: true,
+        user: { fullName: { contains: q, mode: 'insensitive' } },
+      },
+      include: { user: { select: { fullName: true } } },
+      take: RESULTS_PER_TYPE,
+    });
+
+    return results.map((m) => ({
+      type: 'member',
+      id: m.id,
+      title: m.user.fullName,
+      summary: m.organization ?? '',
+      url: `/membership/directory/${m.id}`,
+    }));
+  }
+
+  private dateRange(
+    from?: string,
+    to?: string,
+  ): Prisma.DateTimeNullableFilter | undefined {
+    if (!from && !to) return undefined;
+    return {
+      ...(from && { gte: new Date(from) }),
+      ...(to && { lte: new Date(to) }),
+    };
   }
 }
