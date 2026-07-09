@@ -1,26 +1,44 @@
 @import "tailwindcss";
 
+/* UzLab is a single light theme — without this, Tailwind's `dark:` variant
+   still follows the OS prefers-color-scheme regardless of our own CSS
+   variables, so `dark:text-white` etc. would activate on any dark-mode
+   system and fight the white background below. This scopes `dark:` to a
+   `.dark` class we intentionally never add, so it's permanently inert. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --surface: #f6f7f9;
+  --foreground: #16181d;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --accent: #2354e6;
+  --accent-foreground: #ffffff;
+  --warning-bg: #fff8e6;
+  --warning-border: #f2c94c;
+  --warning-foreground: #7a5c00;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-warning-bg: var(--warning-bg);
+  --color-warning-border: var(--warning-border);
+  --color-warning-foreground: var(--warning-foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* UzLab is white/light by default — no automatic dark-mode switch. */
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
