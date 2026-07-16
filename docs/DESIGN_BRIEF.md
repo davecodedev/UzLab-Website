@@ -68,29 +68,29 @@ current build as fixed.
 
 ## 4. Full sitemap to design for
 
+The real site's top-level navigation has exactly six items, confirmed directly from
+uzlab.org — do not add sections beyond this list (earlier drafts of this brief mistakenly
+included Technical Committee and Equipment; neither exists in the real nav, both are cut):
+
 - **Home** — hero, mission snapshot, latest news, upcoming events, clear paths into the sections
   below (not just a wall of links)
-- **About Us** — Mission, Goals, Leadership, Charter/Bylaws
-- **Membership** — Membership types (with pricing), searchable member directory, online
-  application flow
-- **Professional Development** — Courses, Workshops & Seminars (certifications, exams, and a full
-  event calendar are planned later — the concept should show how the page grows into those
-  without a redesign)
-- **Technical Committee** — currently undefined/reserved on both the old site and our sitemap;
-  design a credible "placeholder" state (what this section becomes is still open) rather than
-  fabricating content for it
-- **Publications & Resources** — Cookbook, Legislative & Regulatory Acts, International
-  Literature; needs to read well as a *searchable library*, not a flat list — this is one of the
-  most-used sections
-- **Equipment** — Equipment catalogue, technical specifications (an RFP module and technical
-  guidelines are future additions)
-- **Career** — two distinct tracks: job seekers browsing openings, and employers posting
-  vacancies/reviewing applications
-- **News** — article list + detail
-- **Contact & Feedback** — contact form, feedback form, map/location
-- **Global Search** — cross-cutting, not a page of its own: needs a strong visual identity since
-  it's the primary way many visitors (especially returning ones looking up a specific standard)
-  will actually use the site
+- **О нас / About Us** → Mission, Goals, Leadership, Charter/Bylaws
+- **Членство / Membership** → Membership types (with pricing), searchable member directory,
+  online application flow
+- **Повышение квалификации / Professional Development** → Courses, Workshops & Seminars
+- **Новости / News** — article list + detail, no dropdown
+- **Контакты / Contact & Feedback** — contact form, feedback form, map/location, no dropdown
+- **Еще / More** — a menu containing two distinct groups:
+  - *Publications & Resources*: Cookbook, Legislative & Regulatory Acts, International
+    Literature — needs to read as a *searchable library*, not a flat list; one of the most-used
+    sections
+  - *Career*: two distinct tracks — job seekers browsing openings, employers posting
+    vacancies/reviewing applications
+- **Global Search** — not a nav link, a header entry point (icon/button) present on every page —
+  needs a strong visual identity since it's the primary way many visitors (especially returning
+  ones looking up a specific standard) will actually use the site
+- **Language toggle** — RU/UZ/EN, visible in the header on every page (the real site uses flag
+  icons; keep or improve on that pattern, but it must stay visible and easy to find)
 
 ---
 
@@ -98,11 +98,13 @@ current build as fixed.
 
 - **Every nav item works.** State this as a hard constraint, not a suggestion — it's the single
   biggest gap versus the current site.
-- **Search is a first-class feature, not an afterthought.** It should feel prominent and a little
-  distinctive — worth a real design idea, not just a text input in a corner. (For context: our
-  current build has a hero search bar plus a ⌘K command-palette-style overlay reachable from
-  anywhere; feel free to keep, refine, or replace that idea, but search deserves genuine design
-  attention.)
+- **Search is a first-class feature, not an afterthought.** Three surfaces: a hero search bar on
+  Home; a header-accessible quick-search overlay (e.g. ⌘K) present on every page; and a full
+  Search results page combining a keyword field with a faceted filter panel (content type,
+  category, language, author, tags, date range — all optional and independently combinable;
+  category/language/author/tags apply to Publications only, date range applies to Publications
+  and News). Design idle, zero-results, and populated-results states, not just the happy path.
+- **Language toggle always visible.** RU/UZ/EN in the header on every page.
 - **Give people a reason to come back.** Fresh signals on the homepage (news, events), member
   self-service (directory, course sign-ups, application status), not a static brochure.
 - **Serve distinct intents clearly.** A prospective member, a job seeker, and someone looking up a
