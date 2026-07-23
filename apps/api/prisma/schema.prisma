@@ -21,32 +21,32 @@ enum UserRole {
 }
 
 model User {
-  id            String   @id @default(uuid())
-  email         String   @unique
+  id            String    @id @default(uuid())
+  email         String    @unique
   passwordHash  String
   fullName      String
-  role          UserRole @default(APPLICANT)
-  emailVerified Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  role          UserRole  @default(APPLICANT)
+  emailVerified Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
   deletedAt     DateTime?
 
-  refreshTokens        RefreshToken[]
-  member                Member?
+  refreshTokens          RefreshToken[]
+  member                 Member?
   membershipApplications MembershipApplication[]
-  contactSubmissions    ContactSubmission[]
+  contactSubmissions     ContactSubmission[]
 
   @@index([deletedAt])
 }
 
 model RefreshToken {
-  id        String   @id @default(uuid())
-  tokenHash String   @unique
+  id        String    @id @default(uuid())
+  tokenHash String    @unique
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
   revokedAt DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   @@index([userId])
 }
@@ -60,51 +60,51 @@ enum MembershipApplicationStatus {
 }
 
 model MembershipType {
-  id          String  @id @default(uuid())
-  name        String  @unique
-  slug        String  @unique
-  description String
-  priceCents  Int
-  currency    String  @default("UZS")
+  id           String   @id @default(uuid())
+  name         String   @unique
+  slug         String   @unique
+  description  String
+  priceCents   Int
+  currency     String   @default("UZS")
   durationDays Int
-  isActive    Boolean @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   applications MembershipApplication[]
   members      Member[]
 }
 
 model MembershipApplication {
-  id               String                       @id @default(uuid())
+  id               String                      @id @default(uuid())
   applicantUserId  String
-  applicant        User                         @relation(fields: [applicantUserId], references: [id])
+  applicant        User                        @relation(fields: [applicantUserId], references: [id])
   membershipTypeId String
-  membershipType   MembershipType               @relation(fields: [membershipTypeId], references: [id])
-  status           MembershipApplicationStatus  @default(PENDING)
+  membershipType   MembershipType              @relation(fields: [membershipTypeId], references: [id])
+  status           MembershipApplicationStatus @default(PENDING)
   organization     String?
   phone            String
   notes            String?
   reviewedByUserId String?
   reviewedAt       DateTime?
-  createdAt        DateTime                     @default(now())
-  updatedAt        DateTime                     @updatedAt
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
 
   @@index([status])
 }
 
 model Member {
-  id               String         @id @default(uuid())
-  userId           String         @unique
-  user             User           @relation(fields: [userId], references: [id])
-  membershipTypeId String
-  membershipType   MembershipType @relation(fields: [membershipTypeId], references: [id])
-  organization     String?
-  isDirectoryListed Boolean       @default(true)
-  memberSince      DateTime       @default(now())
-  expiresAt        DateTime?
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  id                String         @id @default(uuid())
+  userId            String         @unique
+  user              User           @relation(fields: [userId], references: [id])
+  membershipTypeId  String
+  membershipType    MembershipType @relation(fields: [membershipTypeId], references: [id])
+  organization      String?
+  isDirectoryListed Boolean        @default(true)
+  memberSince       DateTime       @default(now())
+  expiresAt         DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
 
   @@index([isDirectoryListed])
 }
@@ -118,38 +118,103 @@ enum PublicationCategory {
 }
 
 model Publication {
-  id           String              @id @default(uuid())
-  title        String
-  slug         String              @unique
-  category     PublicationCategory
-  summary      String
-  bodyText     String              // plain-text content used for search indexing
-  fileUrl      String?             // object storage key, if a document is attached
-  language     String              @default("uz")
-  tags         String[]            @default([])
-  author       String?
-  publishedAt  DateTime?
-  createdAt    DateTime            @default(now())
-  updatedAt    DateTime            @updatedAt
-  deletedAt    DateTime?
+  id          String              @id @default(uuid())
+  title       String
+  slug        String              @unique
+  category    PublicationCategory
+  summary     String
+  bodyText    String // plain-text content used for search indexing
+  fileUrl     String? // object storage key, if a document is attached
+  language    String              @default("uz")
+  tags        String[]            @default([])
+  author      String?
+  publishedAt DateTime?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  deletedAt   DateTime?
 
   @@index([category])
   @@index([publishedAt])
   @@index([deletedAt])
 }
 
+// --- Laboratory Registry --------------------------------------------------
+// A public directory of laboratories (not necessarily UzLab members) —
+// distinct from Member/MembershipType above, which track the association's
+// own membership. isUzLabMember cross-references the two without merging
+// them, since "registered in the national lab registry" and "is a UzLab
+// member" are different, overlapping sets.
+
+enum LaboratoryField {
+  TESTING
+  METROLOGY
+  MEDICINE
+  ECOLOGY
+  INDUSTRY
+  AGRICULTURE
+  FOOD
+  CONSTRUCTION
+  OTHER
+}
+
+enum AccreditationStatus {
+  ACCREDITED
+  SUSPENDED
+  EXPIRED
+  PENDING
+  UNKNOWN
+}
+
+// Where a record came from — matters once bulk government-sourced imports
+// start alongside self-registration and manual admin entry.
+enum LaboratorySource {
+  SELF_REGISTERED
+  GOVERNMENT_IMPORT
+  MANUAL_ENTRY
+}
+
+model Laboratory {
+  id                  String              @id @default(uuid())
+  name                String
+  slug                String              @unique
+  fields              LaboratoryField[]   @default([])
+  accreditationNumber String?             @unique
+  accreditationBody   String?
+  accreditationStatus AccreditationStatus @default(UNKNOWN)
+  accreditedUntil     DateTime?
+  taxId               String?
+  region              String?
+  city                String?
+  address             String?
+  phone               String?
+  email               String?
+  website             String?
+  description         String?
+  isUzLabMember       Boolean             @default(false)
+  isPublished         Boolean             @default(true)
+  source              LaboratorySource    @default(MANUAL_ENTRY)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  deletedAt           DateTime?
+
+  @@index([region])
+  @@index([accreditationStatus])
+  @@index([isPublished])
+  @@index([deletedAt])
+}
+
 // --- Media & Contact -----------------------------------------------------
 
 model NewsArticle {
-  id            String   @id @default(uuid())
+  id            String    @id @default(uuid())
   title         String
-  slug          String   @unique
+  slug          String    @unique
   summary       String
   bodyText      String
   coverImageUrl String?
   publishedAt   DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
   deletedAt     DateTime?
 
   @@index([publishedAt])
@@ -168,15 +233,15 @@ enum ContactSubmissionStatus {
 }
 
 model ContactSubmission {
-  id        String                   @id @default(uuid())
+  id        String                  @id @default(uuid())
   type      ContactSubmissionType
   name      String
   email     String
   message   String
-  status    ContactSubmissionStatus  @default(NEW)
+  status    ContactSubmissionStatus @default(NEW)
   userId    String?
-  user      User?                    @relation(fields: [userId], references: [id])
-  createdAt DateTime                 @default(now())
+  user      User?                   @relation(fields: [userId], references: [id])
+  createdAt DateTime                @default(now())
 
   @@index([status])
 }

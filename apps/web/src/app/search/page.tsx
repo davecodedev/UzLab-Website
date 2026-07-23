@@ -3,7 +3,7 @@ import { SearchFiltersForm } from "@/components/SearchFiltersForm";
 import { api } from "@/lib/api";
 
 interface SearchResultItem {
-  type: "publication" | "news" | "member";
+  type: "publication" | "news" | "member" | "laboratory";
   id: string;
   title: string;
   summary: string;
@@ -13,6 +13,7 @@ interface SearchResultItem {
   tags?: string[];
   author?: string | null;
   publishedAt?: string | null;
+  region?: string | null;
 }
 
 type SearchParams = {
@@ -22,6 +23,8 @@ type SearchParams = {
   language?: string;
   author?: string;
   tags?: string;
+  region?: string;
+  labField?: string;
   dateFrom?: string;
   dateTo?: string;
 };
@@ -74,7 +77,7 @@ export default async function SearchPage({
             </Link>
             <p className="mt-1 text-sm text-black/60 dark:text-white/60">{item.summary}</p>
             <p className="mt-1 text-xs uppercase tracking-wide text-black/40 dark:text-white/40">
-              {[item.type, item.category, item.language, item.author]
+              {[item.type, item.category, item.language, item.author, item.region]
                 .filter(Boolean)
                 .join(" · ")}
             </p>

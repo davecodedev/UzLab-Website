@@ -5,6 +5,7 @@ import { AuthModule } from './modules/auth/auth.module.js';
 import { MembershipModule } from './modules/membership/membership.module.js';
 import { PublicationsModule } from './modules/publications/publications.module.js';
 import { MediaModule } from './modules/media/media.module.js';
+import { LaboratoriesModule } from './modules/laboratories/laboratories.module.js';
 import { SearchModule } from './modules/search/search.module.js';
 import { HealthModule } from './modules/health/health.module.js';
 
@@ -21,6 +22,7 @@ import { HealthModule } from './modules/health/health.module.js';
     MembershipModule,
     PublicationsModule,
     MediaModule,
+    LaboratoriesModule,
     SearchModule,
     HealthModule,
   ],

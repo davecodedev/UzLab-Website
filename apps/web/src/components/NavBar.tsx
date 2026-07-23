@@ -15,6 +15,7 @@ const PRIMARY_LINKS = [
 
 const PROGRAM_LINKS = [
   { href: "/professional-development", label: "Professional Development" },
+  { href: "/laboratories", label: "Laboratory Registry" },
   { href: "/technical-committee", label: "Technical Committee" },
   { href: "/equipment", label: "Equipment" },
   { href: "/career", label: "Career" },

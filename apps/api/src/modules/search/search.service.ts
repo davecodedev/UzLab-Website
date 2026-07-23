@@ -4,7 +4,7 @@ import { PrismaService } from '../../common/prisma/prisma.service.js';
 import { SearchQueryDto, SearchResultType } from './dto/search-query.dto.js';
 
 export interface SearchResultItem {
-  type: 'publication' | 'news' | 'member';
+  type: 'publication' | 'news' | 'member' | 'laboratory';
   id: string;
   title: string;
   summary: string;
@@ -14,6 +14,7 @@ export interface SearchResultItem {
   tags?: string[];
   author?: string | null;
   publishedAt?: string | null;
+  region?: string | null;
 }
 
 const RESULTS_PER_TYPE = 20;
@@ -36,6 +37,8 @@ export class SearchService {
       !!query.language ||
       !!query.author ||
       (query.tags && query.tags.length > 0) ||
+      !!query.region ||
+      !!query.labField ||
       !!query.dateFrom ||
       !!query.dateTo;
 
@@ -45,13 +48,16 @@ export class SearchService {
 
     const wantsType = (type: SearchResultType) =>
       !query.type || query.type === type;
-    // category/language/tags/author only apply to Publications — if one of
-    // those is the *only* filter set, News/Members have nothing to match
-    // against and must return empty rather than "everything".
+    // category/language/tags/author only apply to Publications, region/
+    // labField only to Laboratories — if one of those is the *only* filter
+    // set, other types have nothing to match against and must return empty
+    // rather than "everything".
     const hasNewsApplicableFilter =
       hasKeyword || !!query.dateFrom || !!query.dateTo;
+    const hasLabApplicableFilter =
+      hasKeyword || !!query.region || !!query.labField || !!query.dateFrom || !!query.dateTo;
 
-    const [publications, news, members] = await Promise.all([
+    const [publications, news, members, laboratories] = await Promise.all([
       wantsType(SearchResultType.PUBLICATION)
         ? this.searchPublications(q, query)
         : Promise.resolve([]),
@@ -61,9 +67,12 @@ export class SearchService {
       wantsType(SearchResultType.MEMBER) && hasKeyword
         ? this.searchMembers(q)
         : Promise.resolve([]),
+      wantsType(SearchResultType.LABORATORY) && hasLabApplicableFilter
+        ? this.searchLaboratories(q, query)
+        : Promise.resolve([]),
     ]);
 
-    return [...publications, ...news, ...members];
+    return [...publications, ...news, ...members, ...laboratories];
   }
 
   private async searchPublications(
@@ -163,6 +172,36 @@ export class SearchService {
       title: m.user.fullName,
       summary: m.organization ?? '',
       url: `/membership/directory/${m.id}`,
+    }));
+  }
+
+  private async searchLaboratories(
+    q: string | undefined,
+    filters: SearchQueryDto,
+  ): Promise<SearchResultItem[]> {
+    const where: Prisma.LaboratoryWhereInput = {
+      deletedAt: null,
+      isPublished: true,
+      region: filters.region ? { equals: filters.region, mode: 'insensitive' } : undefined,
+      fields: filters.labField ? { has: filters.labField } : undefined,
+      ...(q && {
+        OR: [
+          { name: { contains: q, mode: 'insensitive' } },
+          { accreditationNumber: { contains: q, mode: 'insensitive' } },
+        ],
+      }),
+    };
+
+    const results = await this.prisma.laboratory.findMany({ where, take: RESULTS_PER_TYPE });
+
+    return results.map((lab) => ({
+      type: 'laboratory',
+      id: lab.id,
+      title: lab.name,
+      summary: lab.accreditationNumber ?? '',
+      url: `/laboratories/${lab.slug}`,
+      category: lab.fields[0],
+      region: lab.region,
     }));
   }
 

@@ -10,6 +10,20 @@ const TYPES = [
   { value: "publication", label: "Publications" },
   { value: "news", label: "News" },
   { value: "member", label: "Members" },
+  { value: "laboratory", label: "Laboratories" },
+];
+
+const LAB_FIELDS = [
+  { value: "", label: "Any field" },
+  { value: "TESTING", label: "Testing" },
+  { value: "METROLOGY", label: "Metrology" },
+  { value: "MEDICINE", label: "Medicine" },
+  { value: "ECOLOGY", label: "Ecology" },
+  { value: "INDUSTRY", label: "Industry" },
+  { value: "AGRICULTURE", label: "Agriculture" },
+  { value: "FOOD", label: "Food" },
+  { value: "CONSTRUCTION", label: "Construction" },
+  { value: "OTHER", label: "Other" },
 ];
 
 export interface SearchFiltersValue {
@@ -19,6 +33,8 @@ export interface SearchFiltersValue {
   language?: string;
   author?: string;
   tags?: string;
+  region?: string;
+  labField?: string;
   dateFrom?: string;
   dateTo?: string;
 }
@@ -134,6 +150,33 @@ export function SearchFiltersForm({
             type="date"
             name="dateTo"
             defaultValue={values.dateTo ?? ""}
+            className={`mt-1 ${inputClass}`}
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-black/60 dark:text-white/60">
+            Lab field
+          </label>
+          <select
+            name="labField"
+            defaultValue={values.labField ?? ""}
+            className={`mt-1 ${inputClass}`}
+          >
+            {LAB_FIELDS.map((f) => (
+              <option key={f.value} value={f.value}>
+                {f.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-black/60 dark:text-white/60">
+            Region
+          </label>
+          <input
+            name="region"
+            defaultValue={values.region ?? ""}
+            placeholder="Toshkent…"
             className={`mt-1 ${inputClass}`}
           />
         </div>

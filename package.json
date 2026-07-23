@@ -26,6 +26,7 @@
     "fsevents@2.3.3": true,
     "prisma@7.8.0": true,
     "sharp@0.34.5": true,
-    "unrs-resolver@1.12.2": true
+    "unrs-resolver@1.12.2": true,
+    "puppeteer@25.3.0": true
   }
 }
