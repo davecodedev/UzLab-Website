@@ -8,16 +8,77 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #ffffff;
-  --surface: #f6f7f9;
-  --foreground: #16181d;
-  --muted: #6b7280;
-  --border: #e5e7eb;
-  --accent: #2354e6;
+  /* Brand navy (structure, headers, footers, ink) */
+  --uz-navy-950: #081733;
+  --uz-navy-900: #0b1f42;
+  --uz-navy-800: #10294f;
+  --uz-navy-700: #16346a;
+
+  /* Action blue (links, primary actions, focus, selection) */
+  --uz-blue-700: #1450c8;
+  --uz-blue-600: #1b5fe0;
+  --uz-blue-500: #2e74ec;
+  --uz-blue-400: #5b93f0;
+  --uz-blue-100: #dce9fc;
+  --uz-blue-50: #eff5fe;
+
+  /* Neutrals — cool, navy-tinted */
+  --uz-ink: #101e33;
+  --uz-text: #22334d;
+  --uz-text-muted: #5a6b85;
+  --uz-text-faint: #8494ac;
+  --uz-border: #dce3ee;
+  --uz-border-strong: #c3cedf;
+  --uz-bg: #f5f7fb;
+  --uz-bg-sunken: #edf1f7;
+  --uz-bg-raised: #ffffff;
+
+  /* Warm signal — sparing, never structural */
+  --uz-amber-700: #a85410;
+  --uz-amber-600: #c05e12;
+  --uz-amber-100: #fcebd9;
+
+  /* Semantic */
+  --uz-success: #177e4d;
+  --uz-success-bg: #e2f5ea;
+  --uz-error: #c22b3a;
+  --uz-error-bg: #fbe7e9;
+  --uz-warning: #a85410;
+  --uz-warning-bg: #fcebd9;
+
+  /* Typography — Cyrillic-first */
+  --uz-font-display: "Onest", "Golos Text", system-ui, sans-serif;
+  --uz-font-body: "Golos Text", system-ui, sans-serif;
+  --uz-font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* Radius */
+  --uz-r-sm: 4px;
+  --uz-r-md: 8px;
+  --uz-r-lg: 12px;
+  --uz-r-pill: 999px;
+
+  /* Elevation */
+  --uz-shadow-sm: 0 1px 2px rgba(11, 31, 66, 0.08);
+  --uz-shadow-md: 0 4px 12px rgba(11, 31, 66, 0.1);
+  --uz-shadow-lg: 0 12px 32px rgba(11, 31, 66, 0.14);
+
+  /* Brand slash — the logo's diagonal, reused as a UI motif */
+  --uz-slash-angle: -14deg;
+
+  /* Focus ring */
+  --uz-focus: 0 0 0 2px #ffffff, 0 0 0 4px var(--uz-blue-500);
+
+  /* App-level aliases (existing components) */
+  --background: var(--uz-bg);
+  --surface: #ffffff;
+  --foreground: var(--uz-text);
+  --muted: var(--uz-text-muted);
+  --border: var(--uz-border);
+  --accent: var(--uz-blue-600);
   --accent-foreground: #ffffff;
-  --warning-bg: #fff8e6;
-  --warning-border: #f2c94c;
-  --warning-foreground: #7a5c00;
+  --warning-bg: var(--uz-amber-100);
+  --warning-border: var(--uz-amber-600);
+  --warning-foreground: var(--uz-amber-700);
 }
 
 @theme inline {
@@ -31,8 +92,36 @@
   --color-warning-bg: var(--warning-bg);
   --color-warning-border: var(--warning-border);
   --color-warning-foreground: var(--warning-foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+
+  --color-uz-navy-950: var(--uz-navy-950);
+  --color-uz-navy-900: var(--uz-navy-900);
+  --color-uz-navy-800: var(--uz-navy-800);
+  --color-uz-navy-700: var(--uz-navy-700);
+  --color-uz-blue-700: var(--uz-blue-700);
+  --color-uz-blue-600: var(--uz-blue-600);
+  --color-uz-blue-500: var(--uz-blue-500);
+  --color-uz-blue-400: var(--uz-blue-400);
+  --color-uz-blue-100: var(--uz-blue-100);
+  --color-uz-blue-50: var(--uz-blue-50);
+  --color-uz-ink: var(--uz-ink);
+  --color-uz-text: var(--uz-text);
+  --color-uz-text-muted: var(--uz-text-muted);
+  --color-uz-text-faint: var(--uz-text-faint);
+  --color-uz-border: var(--uz-border);
+  --color-uz-border-strong: var(--uz-border-strong);
+  --color-uz-bg: var(--uz-bg);
+  --color-uz-bg-sunken: var(--uz-bg-sunken);
+  --color-uz-amber-700: var(--uz-amber-700);
+  --color-uz-amber-600: var(--uz-amber-600);
+  --color-uz-amber-100: var(--uz-amber-100);
+  --color-uz-success: var(--uz-success);
+  --color-uz-success-bg: var(--uz-success-bg);
+  --color-uz-error: var(--uz-error);
+  --color-uz-error-bg: var(--uz-error-bg);
+
+  --font-display: var(--uz-font-display);
+  --font-body: var(--uz-font-body);
+  --font-mono: var(--uz-font-mono);
 }
 
 /* UzLab is white/light by default — no automatic dark-mode switch. */
@@ -40,5 +129,30 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--uz-font-body), Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Layered (not left bare) so Tailwind utility classes like text-white can
+   still override link color on dark backgrounds — bare/unlayered CSS always
+   wins over @layer rules regardless of specificity, which silently broke
+   text-white on buttons rendered as <a> before this was layered. */
+@layer base {
+  a {
+    color: var(--uz-blue-600);
+  }
+  a:hover {
+    color: var(--uz-blue-700);
+  }
+}
+
+::selection {
+  background: var(--uz-blue-100);
+}
+
+/* The logo's diagonal, reused everywhere as a UI motif (kickers, active-tab
+   markers, hero accent bars). One class instead of repeating the transform. */
+.uz-slash {
+  transform: skewX(var(--uz-slash-angle));
+  border-radius: 2px;
 }

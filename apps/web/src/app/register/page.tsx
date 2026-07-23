@@ -5,12 +5,24 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { api, ApiError } from "@/lib/api";
 import { storeSession } from "@/lib/auth-client";
+import { AuthShell, AuthInput } from "@/components/AuthShell";
+import { useLang, pick } from "@/lib/i18n";
 
 interface AuthResponse {
   user: { id: string; email: string; fullName: string; role: string };
   accessToken: string;
   refreshToken: string;
 }
+
+const T = {
+  name: { ru: "Организация или имя", uz: "Tashkilot yoki ism", en: "Organization or name" },
+  namePh: { ru: "ИЦ «Стандарт-Сервис»", uz: "«Standart-Servis» SM", en: "Standard-Service TC" },
+  email: { ru: "E-mail", uz: "E-mail", en: "E-mail" },
+  password: { ru: "Пароль", uz: "Parol", en: "Password" },
+  submit: { ru: "Создать аккаунт", uz: "Akkaunt yaratish", en: "Create account" },
+  haveAcc: { ru: "Уже есть аккаунт?", uz: "Akkaunt bormi?", en: "Have an account?" },
+  signInLink: { ru: "Войти", uz: "Kirish", en: "Log in" },
+} as const;
 
 export default function RegisterPage() {
   return (
@@ -23,6 +35,7 @@ export default function RegisterPage() {
 function RegisterForm() {
   const router = useRouter();
   const params = useSearchParams();
+  const { lang } = useLang();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -41,53 +54,47 @@ function RegisterForm() {
   }
 
   return (
-    <div className="mx-auto max-w-md px-6 py-16">
-      <h1 className="text-2xl font-semibold">Create an account</h1>
-      <form onSubmit={handleSubmit} className="mt-8 space-y-4">
-        <div>
-          <label className="block text-sm font-medium">Full name</label>
-          <input
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            required
-            className="mt-1 w-full rounded-md border border-black/15 px-3 py-2 text-sm dark:border-white/20 dark:bg-transparent"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium">Email</label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className="mt-1 w-full rounded-md border border-black/15 px-3 py-2 text-sm dark:border-white/20 dark:bg-transparent"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium">Password</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={8}
-            className="mt-1 w-full rounded-md border border-black/15 px-3 py-2 text-sm dark:border-white/20 dark:bg-transparent"
-          />
-        </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
+    <AuthShell mode="register">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <AuthInput
+          label={pick(T.name, lang)}
+          value={fullName}
+          onChange={(e) => setFullName(e.target.value)}
+          required
+          placeholder={pick(T.namePh, lang)}
+        />
+        <AuthInput
+          label={pick(T.email, lang)}
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          placeholder="familiya@lab.uz"
+        />
+        <AuthInput
+          label={pick(T.password, lang)}
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          minLength={8}
+          placeholder="••••••••"
+        />
+        {error && <p className="text-sm" style={{ color: "var(--uz-error)" }}>{error}</p>}
         <button
           type="submit"
-          className="w-full rounded-md bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
+          className="mt-1 h-[46px] rounded-md text-[15px] font-semibold text-white"
+          style={{ background: "var(--uz-blue-600)" }}
         >
-          Create account
+          {pick(T.submit, lang)}
         </button>
+        <div className="text-center text-[13.5px]" style={{ color: "var(--uz-text-muted)" }}>
+          {pick(T.haveAcc, lang)}{" "}
+          <Link href="/login" className="font-semibold">
+            {pick(T.signInLink, lang)}
+          </Link>
+        </div>
       </form>
-      <p className="mt-4 text-sm text-black/60 dark:text-white/60">
-        Already have an account?{" "}
-        <Link href="/login" className="underline">
-          Log in
-        </Link>
-      </p>
-    </div>
+    </AuthShell>
   );
 }

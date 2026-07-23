@@ -53,10 +53,15 @@ export default async function SearchPage({
   const hasQuery = Object.values(params).some((v) => !!v);
 
   return (
-    <div className="mx-auto max-w-3xl px-6 py-16">
-      <h1 className="text-3xl font-semibold">Search</h1>
-      <p className="mt-2 text-sm text-black/60 dark:text-white/60">
-        Search across publications, news, and the members directory.
+    <div className="mx-auto max-w-[860px] px-8 py-14">
+      <h1
+        className="text-[34px] font-extrabold leading-[1.1]"
+        style={{ fontFamily: "var(--uz-font-display)", color: "var(--uz-navy-900)" }}
+      >
+        Поиск
+      </h1>
+      <p className="mt-2 text-sm" style={{ color: "var(--uz-text-muted)" }}>
+        Публикации, новости, члены ассоциации и лаборатории — в одном поиске.
       </p>
 
       <div className="mt-6">
@@ -64,26 +69,41 @@ export default async function SearchPage({
       </div>
 
       {hasQuery && (
-        <p className="mt-6 text-sm text-black/60 dark:text-white/60">
-          {results.length} result{results.length === 1 ? "" : "s"}
+        <p className="mt-6 text-sm" style={{ color: "var(--uz-text-muted)" }}>
+          {results.length} результат{results.length === 1 ? "" : results.length < 5 ? "а" : "ов"}
         </p>
       )}
 
-      <ul className="mt-4 divide-y divide-black/10 dark:divide-white/10">
-        {results.map((item) => (
-          <li key={`${item.type}-${item.id}`} className="py-4">
-            <Link href={item.url} className="font-medium hover:underline">
-              {item.title}
+      {results.length > 0 && (
+        <div
+          className="mt-4 overflow-hidden rounded-xl bg-white"
+          style={{ border: "1px solid var(--uz-border)" }}
+        >
+          {results.map((item, i) => (
+            <Link
+              key={`${item.type}-${item.id}`}
+              href={item.url}
+              className="block px-6 py-4 transition-colors hover:bg-[var(--uz-blue-50)]"
+              style={i > 0 ? { borderTop: "1px solid var(--uz-border)" } : undefined}
+            >
+              <span className="font-medium" style={{ color: "var(--uz-ink)" }}>
+                {item.title}
+              </span>
+              <p className="mt-1 text-sm" style={{ color: "var(--uz-text-muted)" }}>
+                {item.summary}
+              </p>
+              <p
+                className="mt-1 text-xs uppercase tracking-wide"
+                style={{ color: "var(--uz-text-faint)" }}
+              >
+                {[item.type, item.category, item.language, item.author, item.region]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
             </Link>
-            <p className="mt-1 text-sm text-black/60 dark:text-white/60">{item.summary}</p>
-            <p className="mt-1 text-xs uppercase tracking-wide text-black/40 dark:text-white/40">
-              {[item.type, item.category, item.language, item.author, item.region]
-                .filter(Boolean)
-                .join(" · ")}
-            </p>
-          </li>
-        ))}
-      </ul>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

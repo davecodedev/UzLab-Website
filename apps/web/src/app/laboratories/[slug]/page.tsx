@@ -22,11 +22,11 @@ interface Laboratory {
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  ACCREDITED: "Accredited",
-  SUSPENDED: "Suspended",
-  EXPIRED: "Expired",
-  PENDING: "Pending",
-  UNKNOWN: "Unknown",
+  ACCREDITED: "Аккредитована",
+  SUSPENDED: "Приостановлена",
+  EXPIRED: "Истекла",
+  PENDING: "На рассмотрении",
+  UNKNOWN: "Неизвестно",
 };
 
 async function getLaboratory(slug: string): Promise<Laboratory | null> {
@@ -47,24 +47,64 @@ export default async function LaboratoryDetailPage({
   const lab = await getLaboratory(slug);
   if (!lab) notFound();
 
+  const fields: Array<[string, React.ReactNode]> = [
+    ...(lab.accreditationNumber ? [["Номер аккредитации", lab.accreditationNumber] as [string, React.ReactNode]] : []),
+    ...(lab.accreditationBody ? [["Орган аккредитации", lab.accreditationBody] as [string, React.ReactNode]] : []),
+    ...(lab.city || lab.region
+      ? ([["Местоположение", [lab.city, lab.region].filter(Boolean).join(", ")]] as [string, React.ReactNode][])
+      : []),
+    ...(lab.address ? [["Адрес", lab.address] as [string, React.ReactNode]] : []),
+    ...(lab.phone ? [["Телефон", lab.phone] as [string, React.ReactNode]] : []),
+    ...(lab.email
+      ? ([
+          [
+            "E-mail",
+            <a key="email" href={`mailto:${lab.email}`} className="hover:underline">
+              {lab.email}
+            </a>,
+          ],
+        ] as [string, React.ReactNode][])
+      : []),
+    ...(lab.website
+      ? ([
+          [
+            "Сайт",
+            <a key="website" href={lab.website} target="_blank" rel="noreferrer" className="hover:underline">
+              {lab.website}
+            </a>,
+          ],
+        ] as [string, React.ReactNode][])
+      : []),
+  ];
+
   return (
-    <div className="mx-auto max-w-3xl px-6 py-16">
-      <Link href="/laboratories" className="text-sm text-black/60 hover:underline dark:text-white/60">
-        ← Laboratory Registry
+    <div className="mx-auto max-w-[820px] px-8 py-14">
+      <Link href="/laboratories" className="text-sm font-medium" style={{ color: "var(--uz-text-muted)" }}>
+        ← Реестр лабораторий
       </Link>
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
-        <h1 className="text-3xl font-semibold">{lab.name}</h1>
+        <h1
+          className="text-3xl font-bold leading-tight"
+          style={{ fontFamily: "var(--uz-font-display)", color: "var(--uz-navy-900)" }}
+        >
+          {lab.name}
+        </h1>
         {lab.isUzLabMember && (
-          <span className="rounded-full bg-black/5 px-2 py-0.5 text-xs dark:bg-white/10">
-            UzLab member
+          <span
+            className="rounded-full px-2.5 py-0.5 text-xs font-semibold"
+            style={{ background: "var(--uz-blue-50)", color: "var(--uz-blue-700)" }}
+          >
+            Член UzLab
           </span>
         )}
       </div>
 
-      <p className="mt-2 text-sm uppercase tracking-wide text-black/40 dark:text-white/40">
+      <p className="mt-2 text-sm uppercase tracking-wide" style={{ color: "var(--uz-text-faint)" }}>
         {STATUS_LABELS[lab.accreditationStatus] ?? lab.accreditationStatus}
-        {lab.accreditedUntil ? ` · valid until ${new Date(lab.accreditedUntil).toLocaleDateString()}` : ""}
+        {lab.accreditedUntil
+          ? ` · действует до ${new Date(lab.accreditedUntil).toLocaleDateString("ru-RU")}`
+          : ""}
       </p>
 
       {lab.fields.length > 0 && (
@@ -72,7 +112,8 @@ export default async function LaboratoryDetailPage({
           {lab.fields.map((f) => (
             <span
               key={f}
-              className="rounded-full border border-black/15 px-3 py-1 text-xs dark:border-white/20"
+              className="rounded-full px-3 py-1 text-xs font-medium"
+              style={{ border: "1px solid var(--uz-border-strong)", color: "var(--uz-text)" }}
             >
               {f}
             </span>
@@ -81,65 +122,30 @@ export default async function LaboratoryDetailPage({
       )}
 
       {lab.description && (
-        <p className="mt-6 text-black/80 dark:text-white/80">{lab.description}</p>
+        <p className="mt-6 leading-relaxed" style={{ color: "var(--uz-text)" }}>
+          {lab.description}
+        </p>
       )}
 
-      <dl className="mt-8 grid grid-cols-1 gap-4 border-t border-black/10 pt-6 text-sm dark:border-white/10 sm:grid-cols-2">
-        {lab.accreditationNumber && (
-          <div>
-            <dt className="text-black/50 dark:text-white/50">Accreditation number</dt>
-            <dd className="mt-0.5">{lab.accreditationNumber}</dd>
-          </div>
-        )}
-        {lab.accreditationBody && (
-          <div>
-            <dt className="text-black/50 dark:text-white/50">Accreditation body</dt>
-            <dd className="mt-0.5">{lab.accreditationBody}</dd>
-          </div>
-        )}
-        {(lab.city || lab.region) && (
-          <div>
-            <dt className="text-black/50 dark:text-white/50">Location</dt>
-            <dd className="mt-0.5">{[lab.city, lab.region].filter(Boolean).join(", ")}</dd>
-          </div>
-        )}
-        {lab.address && (
-          <div>
-            <dt className="text-black/50 dark:text-white/50">Address</dt>
-            <dd className="mt-0.5">{lab.address}</dd>
-          </div>
-        )}
-        {lab.phone && (
-          <div>
-            <dt className="text-black/50 dark:text-white/50">Phone</dt>
-            <dd className="mt-0.5">{lab.phone}</dd>
-          </div>
-        )}
-        {lab.email && (
-          <div>
-            <dt className="text-black/50 dark:text-white/50">Email</dt>
-            <dd className="mt-0.5">
-              <a href={`mailto:${lab.email}`} className="hover:underline">
-                {lab.email}
-              </a>
-            </dd>
-          </div>
-        )}
-        {lab.website && (
-          <div>
-            <dt className="text-black/50 dark:text-white/50">Website</dt>
-            <dd className="mt-0.5">
-              <a href={lab.website} target="_blank" rel="noreferrer" className="hover:underline">
-                {lab.website}
-              </a>
-            </dd>
-          </div>
-        )}
-      </dl>
+      {fields.length > 0 && (
+        <dl
+          className="mt-8 grid grid-cols-1 gap-x-6 gap-y-4 pt-6 text-sm sm:grid-cols-2"
+          style={{ borderTop: "1px solid var(--uz-border)" }}
+        >
+          {fields.map(([label, value]) => (
+            <div key={label}>
+              <dt style={{ color: "var(--uz-text-faint)" }}>{label}</dt>
+              <dd className="mt-0.5" style={{ color: "var(--uz-text)" }}>
+                {value}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
 
       {!lab.address && !lab.phone && !lab.email && (
-        <p className="mt-8 text-xs text-black/40 dark:text-white/40">
-          Contact details for this laboratory haven&apos;t been added yet.
+        <p className="mt-8 text-xs" style={{ color: "var(--uz-text-faint)" }}>
+          Контактные данные этой лаборатории пока не добавлены.
         </p>
       )}
     </div>

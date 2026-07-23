@@ -39,8 +39,10 @@ export interface SearchFiltersValue {
   dateTo?: string;
 }
 
-const inputClass =
-  "w-full rounded-md border border-black/15 px-3 py-2 text-sm dark:border-white/20 dark:bg-transparent";
+const inputClass = "w-full rounded-md border px-3 py-2 text-sm outline-none";
+const inputStyle = { borderColor: "var(--uz-border-strong)", color: "var(--uz-text)" };
+const labelClass = "block text-xs font-medium";
+const labelStyle = { color: "var(--uz-text-muted)" };
 
 export function SearchFiltersForm({
   action,
@@ -59,10 +61,12 @@ export function SearchFiltersForm({
           defaultValue={values.q ?? ""}
           placeholder="Keywords…"
           className={inputClass}
+          style={inputStyle}
         />
         <button
           type="submit"
-          className="shrink-0 rounded-md bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
+          className="shrink-0 rounded-md px-4 py-2 text-sm font-semibold text-white"
+          style={{ background: "var(--uz-blue-600)" }}
         >
           Search
         </button>
@@ -71,10 +75,15 @@ export function SearchFiltersForm({
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {showType && (
           <div>
-            <label className="block text-xs font-medium text-black/60 dark:text-white/60">
+            <label className={labelClass} style={labelStyle}>
               Type
             </label>
-            <select name="type" defaultValue={values.type ?? ""} className={`mt-1 ${inputClass}`}>
+            <select
+              name="type"
+              defaultValue={values.type ?? ""}
+              className={`mt-1 ${inputClass}`}
+              style={inputStyle}
+            >
               {TYPES.map((t) => (
                 <option key={t.value} value={t.value}>
                   {t.label}
@@ -84,13 +93,14 @@ export function SearchFiltersForm({
           </div>
         )}
         <div>
-          <label className="block text-xs font-medium text-black/60 dark:text-white/60">
+          <label className={labelClass} style={labelStyle}>
             Category
           </label>
           <select
             name="category"
             defaultValue={values.category ?? ""}
             className={`mt-1 ${inputClass}`}
+            style={inputStyle}
           >
             {CATEGORIES.map((c) => (
               <option key={c.value} value={c.value}>
@@ -100,7 +110,7 @@ export function SearchFiltersForm({
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-black/60 dark:text-white/60">
+          <label className={labelClass} style={labelStyle}>
             Language
           </label>
           <input
@@ -108,20 +118,22 @@ export function SearchFiltersForm({
             defaultValue={values.language ?? ""}
             placeholder="uz, ru, en…"
             className={`mt-1 ${inputClass}`}
+            style={inputStyle}
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-black/60 dark:text-white/60">
+          <label className={labelClass} style={labelStyle}>
             Author
           </label>
           <input
             name="author"
             defaultValue={values.author ?? ""}
             className={`mt-1 ${inputClass}`}
+            style={inputStyle}
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-black/60 dark:text-white/60">
+          <label className={labelClass} style={labelStyle}>
             Tags
           </label>
           <input
@@ -129,10 +141,11 @@ export function SearchFiltersForm({
             defaultValue={values.tags ?? ""}
             placeholder="comma, separated"
             className={`mt-1 ${inputClass}`}
+            style={inputStyle}
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-black/60 dark:text-white/60">
+          <label className={labelClass} style={labelStyle}>
             From date
           </label>
           <input
@@ -140,10 +153,11 @@ export function SearchFiltersForm({
             name="dateFrom"
             defaultValue={values.dateFrom ?? ""}
             className={`mt-1 ${inputClass}`}
+            style={inputStyle}
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-black/60 dark:text-white/60">
+          <label className={labelClass} style={labelStyle}>
             To date
           </label>
           <input
@@ -151,16 +165,18 @@ export function SearchFiltersForm({
             name="dateTo"
             defaultValue={values.dateTo ?? ""}
             className={`mt-1 ${inputClass}`}
+            style={inputStyle}
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-black/60 dark:text-white/60">
+          <label className={labelClass} style={labelStyle}>
             Lab field
           </label>
           <select
             name="labField"
             defaultValue={values.labField ?? ""}
             className={`mt-1 ${inputClass}`}
+            style={inputStyle}
           >
             {LAB_FIELDS.map((f) => (
               <option key={f.value} value={f.value}>
@@ -170,7 +186,7 @@ export function SearchFiltersForm({
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-black/60 dark:text-white/60">
+          <label className={labelClass} style={labelStyle}>
             Region
           </label>
           <input
@@ -178,6 +194,7 @@ export function SearchFiltersForm({
             defaultValue={values.region ?? ""}
             placeholder="Toshkent…"
             className={`mt-1 ${inputClass}`}
+            style={inputStyle}
           />
         </div>
       </div>

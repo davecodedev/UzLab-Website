@@ -27,8 +27,10 @@ export interface LaboratoryFiltersValue {
   status?: string;
 }
 
-const inputClass =
-  "w-full rounded-md border border-black/15 px-3 py-2 text-sm dark:border-white/20 dark:bg-transparent";
+const inputClass = "w-full rounded-md border px-3 py-2 text-sm outline-none";
+const inputStyle = { borderColor: "var(--uz-border-strong)", color: "var(--uz-text)" };
+const labelClass = "block text-xs font-medium";
+const labelStyle = { color: "var(--uz-text-muted)" };
 
 export function LaboratoryFiltersForm({
   action,
@@ -45,10 +47,12 @@ export function LaboratoryFiltersForm({
           defaultValue={values.q ?? ""}
           placeholder="Laboratory name or accreditation number…"
           className={inputClass}
+          style={inputStyle}
         />
         <button
           type="submit"
-          className="shrink-0 rounded-md bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
+          className="shrink-0 rounded-md px-4 py-2 text-sm font-semibold text-white"
+          style={{ background: "var(--uz-blue-600)" }}
         >
           Search
         </button>
@@ -56,10 +60,15 @@ export function LaboratoryFiltersForm({
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <div>
-          <label className="block text-xs font-medium text-black/60 dark:text-white/60">
+          <label className={labelClass} style={labelStyle}>
             Field
           </label>
-          <select name="field" defaultValue={values.field ?? ""} className={`mt-1 ${inputClass}`}>
+          <select
+            name="field"
+            defaultValue={values.field ?? ""}
+            className={`mt-1 ${inputClass}`}
+            style={inputStyle}
+          >
             {FIELDS.map((f) => (
               <option key={f.value} value={f.value}>
                 {f.label}
@@ -68,10 +77,15 @@ export function LaboratoryFiltersForm({
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-black/60 dark:text-white/60">
+          <label className={labelClass} style={labelStyle}>
             Status
           </label>
-          <select name="status" defaultValue={values.status ?? ""} className={`mt-1 ${inputClass}`}>
+          <select
+            name="status"
+            defaultValue={values.status ?? ""}
+            className={`mt-1 ${inputClass}`}
+            style={inputStyle}
+          >
             {STATUSES.map((s) => (
               <option key={s.value} value={s.value}>
                 {s.label}
@@ -80,7 +94,7 @@ export function LaboratoryFiltersForm({
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-black/60 dark:text-white/60">
+          <label className={labelClass} style={labelStyle}>
             Region
           </label>
           <input
@@ -88,6 +102,7 @@ export function LaboratoryFiltersForm({
             defaultValue={values.region ?? ""}
             placeholder="Toshkent…"
             className={`mt-1 ${inputClass}`}
+            style={inputStyle}
           />
         </div>
       </div>

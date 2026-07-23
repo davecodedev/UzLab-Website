@@ -35,11 +35,17 @@ async function getLaboratories(params: LaboratoriesSearchParams): Promise<Labora
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  ACCREDITED: "Accredited",
-  SUSPENDED: "Suspended",
-  EXPIRED: "Expired",
-  PENDING: "Pending",
-  UNKNOWN: "Unknown",
+  ACCREDITED: "Аккредитована",
+  SUSPENDED: "Приостановлена",
+  EXPIRED: "Истекла",
+  PENDING: "На рассмотрении",
+  UNKNOWN: "Неизвестно",
+};
+
+const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
+  ACCREDITED: { bg: "var(--uz-success-bg)", color: "var(--uz-success)" },
+  SUSPENDED: { bg: "var(--uz-amber-100)", color: "var(--uz-amber-700)" },
+  EXPIRED: { bg: "var(--uz-error-bg)", color: "var(--uz-error)" },
 };
 
 export default async function LaboratoriesPage({
@@ -51,10 +57,16 @@ export default async function LaboratoriesPage({
   const laboratories = await getLaboratories(params);
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-16">
-      <h1 className="text-3xl font-semibold">Laboratory Registry</h1>
-      <p className="mt-2 text-black/70 dark:text-white/70">
-        Accredited testing, calibration, medical, and metrology laboratories in Uzbekistan.
+    <div className="mx-auto max-w-[1024px] px-8 py-14">
+      <h1
+        className="text-[34px] font-extrabold leading-[1.1]"
+        style={{ fontFamily: "var(--uz-font-display)", color: "var(--uz-navy-900)" }}
+      >
+        Реестр лабораторий
+      </h1>
+      <p className="mt-2 max-w-[620px] text-[15px]" style={{ color: "var(--uz-text-muted)" }}>
+        Аккредитованные испытательные, калибровочные, медицинские и метрологические лаборатории
+        Узбекистана.
       </p>
 
       <div className="mt-8">
@@ -62,32 +74,61 @@ export default async function LaboratoriesPage({
       </div>
 
       {laboratories.length === 0 ? (
-        <p className="mt-8 text-sm text-black/60 dark:text-white/60">No laboratories found.</p>
+        <p className="mt-8 text-sm" style={{ color: "var(--uz-text-muted)" }}>
+          Лаборатории не найдены.
+        </p>
       ) : (
-        <ul className="mt-8 divide-y divide-black/10 dark:divide-white/10">
-          {laboratories.map((lab) => (
-            <li key={lab.id} className="py-4">
-              <Link href={`/laboratories/${lab.slug}`} className="font-medium hover:underline">
-                {lab.name}
-              </Link>
-              {lab.isUzLabMember && (
-                <span className="ml-2 rounded-full bg-black/5 px-2 py-0.5 text-xs dark:bg-white/10">
-                  UzLab member
+        <div
+          className="mt-8 overflow-hidden rounded-xl bg-white"
+          style={{ border: "1px solid var(--uz-border)" }}
+        >
+          {laboratories.map((lab, i) => {
+            const statusColor = STATUS_COLORS[lab.accreditationStatus] ?? {
+              bg: "var(--uz-bg-sunken)",
+              color: "var(--uz-text-muted)",
+            };
+            return (
+              <Link
+                key={lab.id}
+                href={`/laboratories/${lab.slug}`}
+                className="block px-6 py-4 transition-colors hover:bg-[var(--uz-blue-50)]"
+                style={i > 0 ? { borderTop: "1px solid var(--uz-border)" } : undefined}
+              >
+                <span className="font-medium" style={{ color: "var(--uz-ink)" }}>
+                  {lab.name}
                 </span>
-              )}
-              <p className="mt-1 text-xs uppercase tracking-wide text-black/40 dark:text-white/40">
-                {[
-                  lab.fields.join(", "),
-                  STATUS_LABELS[lab.accreditationStatus] ?? lab.accreditationStatus,
-                  [lab.city, lab.region].filter(Boolean).join(", "),
-                  lab.accreditationNumber,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </p>
-            </li>
-          ))}
-        </ul>
+                {lab.isUzLabMember && (
+                  <span
+                    className="ml-2 rounded-full px-2 py-0.5 text-xs font-semibold"
+                    style={{ background: "var(--uz-blue-50)", color: "var(--uz-blue-700)" }}
+                  >
+                    Член UzLab
+                  </span>
+                )}
+                <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                  <span
+                    className="rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                    style={{ background: statusColor.bg, color: statusColor.color }}
+                  >
+                    {STATUS_LABELS[lab.accreditationStatus] ?? lab.accreditationStatus}
+                  </span>
+                  <span
+                    className="text-xs uppercase tracking-wide"
+                    style={{ color: "var(--uz-text-faint)" }}
+                  >
+                    {[
+                      lab.fields.join(", "),
+                      [lab.city, lab.region].filter(Boolean).join(", "),
+                      lab.accreditationNumber,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
       )}
     </div>
   );
