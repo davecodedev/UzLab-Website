@@ -15,6 +15,7 @@
     "seed:admin": "ts-node --project tsconfig.scripts.json --transpile-only scripts/seed-admin.ts",
     "import:content": "ts-node --project tsconfig.scripts.json --transpile-only scripts/import-content.ts",
     "import:akkred": "ts-node --project tsconfig.scripts.json --transpile-only scripts/import-akkred-registry.ts",
+    "seed:design-content": "ts-node --project tsconfig.scripts.json --transpile-only scripts/seed-design-content.ts",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",

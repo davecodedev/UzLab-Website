@@ -5,7 +5,65 @@ import { useState } from "react";
 
 type Track = "seeker" | "employer";
 
-const CITIES = ["Ташкент", "Самарканд", "Бухара", "Наманган"];
+const CITIES = ["Ташкент", "Бухара", "Фергана", "Чирчик"];
+
+type Job = {
+  title: string;
+  org: string;
+  city: string;
+  salary: string;
+  tag: string;
+  urgent: boolean;
+  posted: string;
+};
+
+const JOBS: Job[] = [
+  {
+    title: "Инженер-химик, лаборатория питьевой воды",
+    org: "Тошкент сув таъминоти",
+    city: "Ташкент",
+    salary: "от 8,0 млн",
+    tag: "Полная занятость",
+    urgent: false,
+    posted: "2 дня назад",
+  },
+  {
+    title: "Лаборант микробиологического отдела",
+    org: "ИЦ «Стандарт-Сервис»",
+    city: "Ташкент",
+    salary: "от 5,5 млн",
+    tag: "Срочно",
+    urgent: true,
+    posted: "4 дня назад",
+  },
+  {
+    title: "Метролог по калибровке средств измерений",
+    org: "Республиканский центр метрологии",
+    city: "Бухара",
+    salary: "от 7,0 млн",
+    tag: "Полная занятость",
+    urgent: false,
+    posted: "неделю назад",
+  },
+  {
+    title: "Начальник испытательной лаборатории",
+    org: "Агросифат",
+    city: "Фергана",
+    salary: "от 12,0 млн",
+    tag: "Руководитель",
+    urgent: true,
+    posted: "неделю назад",
+  },
+  {
+    title: "Специалист по качеству (ISO/IEC 17025)",
+    org: "Узкимёсаноат",
+    city: "Чирчик",
+    salary: "договорная",
+    tag: "Полная занятость",
+    urgent: false,
+    posted: "2 недели назад",
+  },
+];
 
 function BriefcaseIcon({ active }: { active: boolean }) {
   return (
@@ -120,6 +178,15 @@ function SeekerTrack() {
   const [query, setQuery] = useState("");
   const [city, setCity] = useState<string | null>(null);
 
+  const filtered = JOBS.filter((job) => {
+    const matchesCity = !city || job.city === city;
+    const matchesQuery =
+      !query.trim() ||
+      job.title.toLowerCase().includes(query.trim().toLowerCase()) ||
+      job.org.toLowerCase().includes(query.trim().toLowerCase());
+    return matchesCity && matchesQuery;
+  });
+
   return (
     <div className="mt-8">
       <Kicker label="ОТКРЫТЫЕ ВАКАНСИИ" />
@@ -161,13 +228,61 @@ function SeekerTrack() {
         })}
       </div>
 
-      <div className="mt-6">
-        <EmptyPanel
-          icon={<BriefcaseIcon active={false} />}
-          heading="Вакансии ещё не опубликованы"
-          description="Как только лаборатории начнут размещать открытые позиции, они появятся здесь с фильтрами по городу и специализации."
-        />
-      </div>
+      <p className="mt-4 text-[13px] font-medium" style={{ color: "var(--uz-text-muted)" }}>
+        {filtered.length} вакансий
+      </p>
+
+      {filtered.length > 0 ? (
+        <div
+          className="mt-3 overflow-hidden rounded-xl border bg-white"
+          style={{ borderColor: "var(--uz-border)" }}
+        >
+          {filtered.map((job, idx) => (
+            <Link
+              key={job.title}
+              href="/contact"
+              className="flex flex-col gap-2.5 px-5 py-4 transition-colors hover:bg-[var(--uz-bg-sunken)] sm:flex-row sm:items-center sm:justify-between"
+              style={{ borderTop: idx === 0 ? "none" : "1px solid var(--uz-border)" }}
+            >
+              <div>
+                <p className="text-[15px] font-bold" style={{ color: "var(--uz-navy-900)" }}>
+                  {job.title}
+                </p>
+                <p className="mt-0.5 text-[13px]" style={{ color: "var(--uz-text-muted)" }}>
+                  {job.org} · {job.city}
+                </p>
+              </div>
+              <div className="flex flex-col items-start gap-1.5 sm:items-end sm:shrink-0">
+                <span className="text-[15px] font-bold" style={{ color: "var(--uz-navy-900)" }}>
+                  {job.salary}
+                </span>
+                <div className="flex items-center gap-2">
+                  <span
+                    className="rounded-full px-2.5 py-0.5 text-[12px] font-semibold"
+                    style={{
+                      background: job.urgent ? "var(--uz-amber-100)" : "var(--uz-bg-sunken)",
+                      color: job.urgent ? "var(--uz-amber-700)" : "var(--uz-text-muted)",
+                    }}
+                  >
+                    {job.tag}
+                  </span>
+                  <span className="text-[12px]" style={{ color: "var(--uz-text-faint)" }}>
+                    {job.posted}
+                  </span>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-3">
+          <EmptyPanel
+            icon={<BriefcaseIcon active={false} />}
+            heading="По вашему запросу ничего не найдено"
+            description="Попробуйте изменить город или ключевые слова поиска."
+          />
+        </div>
+      )}
     </div>
   );
 }

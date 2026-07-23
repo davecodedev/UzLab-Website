@@ -8,6 +8,11 @@ const FOOTER_DICT = {
   membership: { ru: "Членство", uz: "A'zolik", en: "Membership" },
   publications: { ru: "Публикации", uz: "Nashrlar", en: "Publications" },
   contact: { ru: "Контакты", uz: "Aloqa", en: "Contact" },
+  address: {
+    ru: "Ташкент, ул. Мустакиллик, 45",
+    uz: "Toshkent, Mustaqillik ko'chasi, 45",
+    en: "Tashkent, Mustaqillik St. 45",
+  },
 } as const;
 
 export function Footer() {
@@ -40,7 +45,7 @@ export function Footer() {
           ))}
         </div>
         <span className="text-[13px]" style={{ color: "#5A6B85" }}>
-          © {new Date().getFullYear()} UzLab
+          © {new Date().getFullYear()} UzLab · {pick(FOOTER_DICT.address, lang)}
         </span>
       </div>
     </footer>

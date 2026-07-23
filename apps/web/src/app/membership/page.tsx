@@ -35,7 +35,24 @@ async function getDirectory(): Promise<DirectoryEntry[]> {
 }
 
 function formatPrice(cents: number, currency: string) {
-  return `${(cents / 100).toLocaleString()} ${currency}`;
+  const amount = cents / 100;
+  try {
+    return new Intl.NumberFormat("ru-RU", {
+      style: "currency",
+      currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  } catch {
+    return `${amount.toLocaleString()} ${currency}`;
+  }
+}
+
+function formatDuration(days: number) {
+  if (days === 365) return "год";
+  if (days === 30) return "мес.";
+  if (days === 182 || days === 183) return "полугодие";
+  return `${days} дн.`;
 }
 
 function initials(fullName: string) {
@@ -58,8 +75,73 @@ function Kicker({ label }: { label: string }) {
   );
 }
 
+function TierCard({ type, featured }: { type: MembershipType; featured: boolean }) {
+  return (
+    <div
+      className="relative flex flex-col rounded-xl bg-white p-6"
+      style={{
+        border: featured ? "2px solid var(--uz-blue-600)" : "1px solid var(--uz-border)",
+        boxShadow: "var(--uz-shadow-sm)",
+      }}
+    >
+      {featured && (
+        <span
+          className="absolute -top-3 left-6 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-white"
+          style={{ background: "var(--uz-blue-600)" }}
+        >
+          Популярный выбор
+        </span>
+      )}
+      <h4 className="text-lg font-bold leading-snug" style={{ color: "var(--uz-navy-900)" }}>
+        {type.name}
+      </h4>
+      <p
+        className="mt-3 text-2xl font-extrabold"
+        style={{ fontFamily: "var(--uz-font-display)", color: "var(--uz-navy-900)" }}
+      >
+        {formatPrice(type.priceCents, type.currency)}
+        <span
+          className="ml-1.5 text-sm font-medium"
+          style={{ color: "var(--uz-text-muted)", fontFamily: "var(--uz-font-body)" }}
+        >
+          {" "}
+          / {formatDuration(type.durationDays)}
+        </span>
+      </p>
+      <p className="mt-4 flex-1 text-sm leading-relaxed" style={{ color: "var(--uz-text-muted)" }}>
+        {type.description}
+      </p>
+    </div>
+  );
+}
+
+function TierGroup({ title, types }: { title: string; types: MembershipType[] }) {
+  if (types.length === 0) return null;
+  return (
+    <div className="mt-10 first:mt-0">
+      <h3
+        className="mb-5 text-xl font-bold"
+        style={{ fontFamily: "var(--uz-font-display)", color: "var(--uz-navy-900)" }}
+      >
+        {title}
+      </h3>
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {types.map((type) => (
+          <TierCard key={type.id} type={type} featured={type.slug.endsWith("-medium")} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default async function MembershipPage() {
   const [types, directory] = await Promise.all([getTypes(), getDirectory()]);
+
+  const laboratoryTypes = types.filter((type) => type.slug.startsWith("laboratory"));
+  const associateTypes = types.filter((type) => type.slug.startsWith("associate"));
+  const otherTypes = types.filter(
+    (type) => !type.slug.startsWith("laboratory") && !type.slug.startsWith("associate"),
+  );
 
   return (
     <div className="mx-auto max-w-[1240px] px-8 py-16">
@@ -103,34 +185,11 @@ export default async function MembershipPage() {
             Категории членства пока не настроены.
           </div>
         ) : (
-          <div className="grid gap-5 sm:grid-cols-2">
-            {types.map((type) => (
-              <div
-                key={type.id}
-                className="rounded-xl bg-white p-6"
-                style={{ border: "1px solid var(--uz-border)", boxShadow: "var(--uz-shadow-sm)" }}
-              >
-                <h3 className="text-lg font-bold" style={{ color: "var(--uz-navy-900)" }}>
-                  {type.name}
-                </h3>
-                <p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--uz-text-muted)" }}>
-                  {type.description}
-                </p>
-                <p
-                  className="mt-5 text-2xl font-extrabold"
-                  style={{ fontFamily: "var(--uz-font-display)", color: "var(--uz-navy-900)" }}
-                >
-                  {formatPrice(type.priceCents, type.currency)}
-                  <span
-                    className="ml-1.5 text-sm font-medium"
-                    style={{ color: "var(--uz-text-muted)", fontFamily: "var(--uz-font-body)" }}
-                  >
-                    / {type.durationDays} дн.
-                  </span>
-                </p>
-              </div>
-            ))}
-          </div>
+          <>
+            <TierGroup title="Члены — лаборатории" types={laboratoryTypes} />
+            <TierGroup title="Ассоциированные члены" types={associateTypes} />
+            <TierGroup title="Другие категории" types={otherTypes} />
+          </>
         )}
       </section>
 

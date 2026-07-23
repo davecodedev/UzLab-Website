@@ -5,10 +5,18 @@ import { useState } from "react";
 import { api, ApiError } from "@/lib/api";
 
 const CONTACT_FIELDS = [
-  { label: "АДРЕС", value: "Уточняется" },
-  { label: "ТЕЛЕФОН", value: "Уточняется" },
-  { label: "E-MAIL", value: "Уточняется" },
-  { label: "ПРИЁМНЫЕ ЧАСЫ", value: "Уточняется" },
+  { label: "АДРЕС", value: "Ташкент, ул. Мустакиллик, 45, офис 301" },
+  { label: "ТЕЛЕФОН", value: "+998 71 200-45-67" },
+  { label: "E-MAIL", value: "info@uzlab.org" },
+  { label: "ПРИЁМНЫЕ ЧАСЫ", value: "Пн–Пт, 9:00–18:00 (перерыв 13:00–14:00)" },
+];
+
+const SUBJECTS = [
+  "Вопрос о членстве",
+  "Обучение и семинары",
+  "Публикации и методики",
+  "Техническая поддержка сайта",
+  "Другое",
 ];
 
 const TABS: { value: "CONTACT" | "FEEDBACK"; label: string }[] = [
@@ -20,6 +28,7 @@ export default function ContactPage() {
   const [type, setType] = useState<"CONTACT" | "FEEDBACK">("CONTACT");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [subject, setSubject] = useState(SUBJECTS[0]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
@@ -28,7 +37,9 @@ export default function ContactPage() {
     e.preventDefault();
     setError(null);
     try {
-      await api.post("/contact", { type, name, email, message });
+      // No dedicated "subject" field on the backend — folded into the message
+      // body rather than silently dropped, so staff still see it.
+      await api.post("/contact", { type, name, email, message: `Тема: ${subject}\n\n${message}` });
       setSubmitted(true);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Submission failed.");
@@ -92,15 +103,28 @@ export default function ContactPage() {
             </div>
 
             <div
-              className="mt-5 flex aspect-video items-center justify-center rounded-xl border border-dashed text-center"
-              style={{ background: "var(--uz-blue-50)", borderColor: "var(--uz-border-strong)" }}
+              className="overflow-hidden rounded-xl"
+              style={{ border: "1px solid var(--uz-border)" }}
             >
-              <span
-                className="px-4 text-[12px] font-medium tracking-[0.5px]"
-                style={{ fontFamily: "var(--uz-font-mono)", color: "var(--uz-text-faint)" }}
+              <div
+                className="flex aspect-video items-center justify-center border-b border-dashed text-center"
+                style={{ background: "var(--uz-blue-50)", borderColor: "var(--uz-border-strong)" }}
               >
-                КАРТА · Яндекс/Google Maps embed
-              </span>
+                <span
+                  className="px-4 text-[12px] font-medium tracking-[0.5px]"
+                  style={{ fontFamily: "var(--uz-font-mono)", color: "var(--uz-text-faint)" }}
+                >
+                  КАРТА · Яндекс/Google Maps embed
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3 px-4 py-3">
+                <span className="text-[13.5px]" style={{ color: "var(--uz-text-muted)" }}>
+                  Станция метро «Мустакиллик майдони», 5 минут пешком
+                </span>
+                <span className="shrink-0 text-[13.5px] font-semibold" style={{ color: "var(--uz-blue-600)" }}>
+                  Открыть карту →
+                </span>
+              </div>
             </div>
           </div>
 
@@ -138,7 +162,7 @@ export default function ContactPage() {
 
             <div className="p-6 sm:p-8">
               {submitted ? (
-                <p style={{ color: "var(--uz-text-muted)" }}>Thanks — we&apos;ll be in touch.</p>
+                <p style={{ color: "var(--uz-text-muted)" }}>Спасибо — мы свяжемся с вами.</p>
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-5">
                   <div>
@@ -166,6 +190,25 @@ export default function ContactPage() {
                       style={{ border: "1px solid var(--uz-border-strong)" }}
                     />
                   </div>
+                  {type === "CONTACT" && (
+                    <div>
+                      <label className="block text-sm font-bold" style={{ color: "var(--uz-ink)" }}>
+                        Тема
+                      </label>
+                      <select
+                        value={subject}
+                        onChange={(e) => setSubject(e.target.value)}
+                        className="mt-1.5 h-11 w-full rounded-md px-3.5 text-sm outline-none"
+                        style={{ border: "1px solid var(--uz-border-strong)" }}
+                      >
+                        {SUBJECTS.map((s) => (
+                          <option key={s} value={s}>
+                            {s}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <div>
                     <label className="block text-sm font-bold" style={{ color: "var(--uz-ink)" }}>
                       Сообщение

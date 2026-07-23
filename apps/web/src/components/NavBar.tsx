@@ -8,11 +8,11 @@ import { clearSession, getStoredUser, isStaff, type StoredUser } from "@/lib/aut
 import { useLang, pick, type Lang } from "@/lib/i18n";
 
 const NAV_DICT = {
+  home: { ru: "Главная", uz: "Bosh sahifa", en: "Home" },
   about: { ru: "О нас", uz: "Biz haqimizda", en: "About" },
   membership: { ru: "Членство", uz: "A'zolik", en: "Membership" },
   training: { ru: "Обучение", uz: "O'qitish", en: "Training" },
-  publications: { ru: "Публикации", uz: "Nashrlar", en: "Publications" },
-  laboratories: { ru: "Лаборатории", uz: "Laboratoriyalar", en: "Laboratories" },
+  search: { ru: "Поиск", uz: "Qidiruv", en: "Search" },
   career: { ru: "Карьера", uz: "Karyera", en: "Career" },
   news: { ru: "Новости", uz: "Yangiliklar", en: "News" },
   contact: { ru: "Контакты", uz: "Aloqa", en: "Contact" },
@@ -23,11 +23,11 @@ const NAV_DICT = {
 
 function NAV_LINKS(lang: Lang) {
   return [
+    { href: "/", label: pick(NAV_DICT.home, lang) },
     { href: "/about", label: pick(NAV_DICT.about, lang) },
     { href: "/membership", label: pick(NAV_DICT.membership, lang) },
     { href: "/professional-development", label: pick(NAV_DICT.training, lang) },
-    { href: "/publications", label: pick(NAV_DICT.publications, lang) },
-    { href: "/laboratories", label: pick(NAV_DICT.laboratories, lang) },
+    { href: "/laboratories", label: pick(NAV_DICT.search, lang) },
     { href: "/career", label: pick(NAV_DICT.career, lang) },
     { href: "/news", label: pick(NAV_DICT.news, lang) },
     { href: "/contact", label: pick(NAV_DICT.contact, lang) },
