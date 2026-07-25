@@ -35,7 +35,19 @@ export interface RegistryFilters {
   fieldType: string;
   region: string;
   status: string;
+  /** "RD — field of accreditation" in the design. No dedicated schema column
+   * for accreditation scope exists, so this matches against the real (if
+   * currently always-null) `description` column — honest against a real
+   * field, just sparse until labs have descriptions on file. */
+  scope: string;
   keywords: string;
+  /** "Normative document" in the design. Same reasoning as `scope` — there's
+   * no dedicated "operates under standard X" column, so this also matches
+   * `description` as a second, independent substring requirement. */
+  standardDoc: string;
+  /** "Stakeholder Registry" in the design — matches real contact-ish columns
+   * (phone/email/website/address/accreditationBody), not a fake field. */
+  stakeholder: string;
 }
 
 export const EMPTY_FILTERS: RegistryFilters = {
@@ -44,11 +56,24 @@ export const EMPTY_FILTERS: RegistryFilters = {
   fieldType: "",
   region: "",
   status: "",
+  scope: "",
   keywords: "",
+  standardDoc: "",
+  stakeholder: "",
 };
 
 export function hasActiveFilters(f: RegistryFilters): boolean {
-  return Boolean(f.regNo || f.orgName || f.fieldType || f.region || f.status || f.keywords);
+  return Boolean(
+    f.regNo ||
+      f.orgName ||
+      f.fieldType ||
+      f.region ||
+      f.status ||
+      f.scope ||
+      f.keywords ||
+      f.standardDoc ||
+      f.stakeholder,
+  );
 }
 
 // --- Localized option lists (real schema values only) ----------------------
@@ -207,12 +232,26 @@ export function matches(lab: Laboratory, f: RegistryFilters): boolean {
   if (f.status && lab.accreditationStatus !== f.status) {
     return false;
   }
+  if (f.scope && !(lab.description ?? "").toLowerCase().includes(f.scope.toLowerCase())) {
+    return false;
+  }
   if (f.keywords) {
     const kw = f.keywords.toLowerCase();
     const haystack = [lab.name, lab.accreditationNumber ?? "", lab.fields.join(" ")]
       .join(" ")
       .toLowerCase();
     if (!haystack.includes(kw)) return false;
+  }
+  if (f.standardDoc && !(lab.description ?? "").toLowerCase().includes(f.standardDoc.toLowerCase())) {
+    return false;
+  }
+  if (f.stakeholder) {
+    const sh = f.stakeholder.toLowerCase();
+    const haystack = [lab.phone, lab.email, lab.website, lab.address, lab.accreditationBody]
+      .filter((v): v is string => Boolean(v))
+      .join(" ")
+      .toLowerCase();
+    if (!haystack.includes(sh)) return false;
   }
   return true;
 }
@@ -226,7 +265,10 @@ export function composeFilterLabel(f: RegistryFilters, lang: Lang): string {
     type: { ru: "Тип", uz: "Turi", en: "Type" },
     region: { ru: "Регион", uz: "Hudud", en: "Region" },
     status: { ru: "Статус", uz: "Holat", en: "Status" },
+    scope: { ru: "ОД", uz: "AD", en: "RD" },
     kw: { ru: "Ключевые слова", uz: "Kalit so'zlar", en: "Keywords" },
+    standardDoc: { ru: "Документ", uz: "Hujjat", en: "Document" },
+    stakeholder: { ru: "Реестр участников", uz: "Ishtirokchilar reyestri", en: "Stakeholder" },
   } as const;
 
   if (f.regNo) parts.push(`${L.regNo[lang]}: ${f.regNo}`);
@@ -234,7 +276,10 @@ export function composeFilterLabel(f: RegistryFilters, lang: Lang): string {
   if (f.fieldType) parts.push(`${L.type[lang]}: ${fieldLabel(f.fieldType, lang)}`);
   if (f.region) parts.push(`${L.region[lang]}: ${regionLabel(f.region === UNSPECIFIED_REGION ? null : f.region, lang)}`);
   if (f.status) parts.push(`${L.status[lang]}: ${statusLabel(f.status, lang)}`);
+  if (f.scope) parts.push(`${L.scope[lang]}: ${f.scope}`);
   if (f.keywords) parts.push(`${L.kw[lang]}: ${f.keywords}`);
+  if (f.standardDoc) parts.push(`${L.standardDoc[lang]}: ${f.standardDoc}`);
+  if (f.stakeholder) parts.push(`${L.stakeholder[lang]}: ${f.stakeholder}`);
 
   return parts.join(" · ");
 }

@@ -85,8 +85,20 @@ const UI = {
   regionsGroup: { ru: "— Регионы Узбекистана —", uz: "— O'zbekiston hududlari —", en: "— Regions of Uzbekistan —" },
   status: { ru: "Статус", uz: "Holat", en: "Status" },
   anyStatus: { ru: "Любой статус", uz: "Har qanday holat", en: "Any status" },
+  scope: { ru: "ОД — область аккредитации", uz: "AD — akkreditatsiya doirasi", en: "RD — field of accreditation" },
+  scopePlaceholder: { ru: "напр. пищевая продукция, вода", uz: "masalan, oziq-ovqat, suv", en: "e.g. food products, water" },
   keywords: { ru: "Ключевые слова", uz: "Kalit so'zlar", en: "Keywords" },
   keywordsPlaceholder: { ru: "название, номер, тип…", uz: "nomi, raqami, turi…", en: "name, number, type…" },
+  standardDoc: { ru: "Нормативный документ", uz: "Normativ hujjat", en: "Normative document" },
+  standardDocPlaceholder: { ru: "напр. ISO/IEC 17025", uz: "masalan, ISO/IEC 17025", en: "e.g. ISO/IEC 17025" },
+  learningCentre: { ru: "Учебный центр", uz: "O'quv markazi", en: "Learning centre" },
+  learningCentrePlaceholder: { ru: "пока не отслеживается", uz: "hozircha kuzatilmaydi", en: "not tracked yet" },
+  stakeholder: { ru: "Реестр участников", uz: "Ishtirokchilar reyestri", en: "Stakeholder registry" },
+  stakeholderPlaceholder: {
+    ru: "напр. организация или контакт",
+    uz: "masalan, tashkilot yoki aloqa",
+    en: "e.g. member organization or contact",
+  },
   searchButton: { ru: "Искать в реестре", uz: "Reyestrdan qidirish", en: "Search register" },
   recentSearches: { ru: "Недавние поиски", uz: "So'nggi qidiruvlar", en: "Recent searches" },
   clear: { ru: "Очистить", uz: "Tozalash", en: "Clear" },
@@ -589,12 +601,64 @@ function FiltersCard({
 
         <div>
           <label className={labelClass()} style={{ color: "var(--reg-gray-2)" }}>
+            {t("scope", lang)}
+          </label>
+          <input
+            value={filters.scope}
+            onChange={(e) => updateFilter("scope", e.target.value)}
+            placeholder={t("scopePlaceholder", lang)}
+            className={inputClass()}
+            style={{ border: "1px solid var(--reg-border)" }}
+          />
+        </div>
+
+        <div>
+          <label className={labelClass()} style={{ color: "var(--reg-gray-2)" }}>
             {t("keywords", lang)}
           </label>
           <input
             value={filters.keywords}
             onChange={(e) => updateFilter("keywords", e.target.value)}
             placeholder={t("keywordsPlaceholder", lang)}
+            className={inputClass()}
+            style={{ border: "1px solid var(--reg-border)" }}
+          />
+        </div>
+
+        <div>
+          <label className={labelClass()} style={{ color: "var(--reg-gray-2)" }}>
+            {t("standardDoc", lang)}
+          </label>
+          <input
+            value={filters.standardDoc}
+            onChange={(e) => updateFilter("standardDoc", e.target.value)}
+            placeholder={t("standardDocPlaceholder", lang)}
+            className={inputClass()}
+            style={{ border: "1px solid var(--reg-border)" }}
+          />
+        </div>
+
+        <div>
+          <label className={labelClass()} style={{ color: "var(--reg-gray-2)" }}>
+            {t("learningCentre", lang)}
+          </label>
+          <input
+            disabled
+            placeholder={t("learningCentrePlaceholder", lang)}
+            title={t("learningCentrePlaceholder", lang)}
+            className={inputClass()}
+            style={{ border: "1px solid var(--reg-border)", background: "var(--reg-panel)", cursor: "not-allowed" }}
+          />
+        </div>
+
+        <div>
+          <label className={labelClass()} style={{ color: "var(--reg-gray-2)" }}>
+            {t("stakeholder", lang)}
+          </label>
+          <input
+            value={filters.stakeholder}
+            onChange={(e) => updateFilter("stakeholder", e.target.value)}
+            placeholder={t("stakeholderPlaceholder", lang)}
             className={inputClass()}
             style={{ border: "1px solid var(--reg-border)" }}
           />
