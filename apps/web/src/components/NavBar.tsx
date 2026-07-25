@@ -86,17 +86,9 @@ function LangPill() {
 
 function Logo() {
   return (
-    <Link href="/" className="flex flex-none items-end" style={{ fontFamily: "var(--uz-font-display)" }}>
-      <span className="text-[23px] font-extrabold leading-none" style={{ color: "var(--uz-navy-900)" }}>
-        Uz
-      </span>
-      <span
-        className="uz-slash mx-[1px] mb-[2px] inline-block h-[19px] w-[4.5px]"
-        style={{ background: "var(--uz-blue-600)" }}
-      />
-      <span className="text-[23px] font-extrabold leading-none" style={{ color: "var(--uz-blue-600)" }}>
-        ab
-      </span>
+    <Link href="/" className="flex flex-none items-center">
+      {/* eslint-disable-next-line @next/next/no-img-element -- fixed-height logo, next/image adds no value here */}
+      <img src="/logo-uzlab.png" alt="UzLab" className="h-[30px] w-auto" />
     </Link>
   );
 }
