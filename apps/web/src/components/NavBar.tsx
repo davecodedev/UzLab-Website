@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { SearchOverlay } from "./SearchOverlay";
 import { clearSession, getStoredUser, isStaff, type StoredUser } from "@/lib/auth-client";
 import { useLang, pick, type Lang } from "@/lib/i18n";
 
@@ -12,7 +11,7 @@ const NAV_DICT = {
   about: { ru: "О нас", uz: "Biz haqimizda", en: "About" },
   membership: { ru: "Членство", uz: "A'zolik", en: "Membership" },
   training: { ru: "Обучение", uz: "O'qitish", en: "Training" },
-  search: { ru: "Поиск", uz: "Qidiruv", en: "Search" },
+  registry: { ru: "Реестр", uz: "Reyestr", en: "Registry" },
   career: { ru: "Карьера", uz: "Karyera", en: "Career" },
   news: { ru: "Новости", uz: "Yangiliklar", en: "News" },
   contact: { ru: "Контакты", uz: "Aloqa", en: "Contact" },
@@ -27,7 +26,7 @@ function NAV_LINKS(lang: Lang) {
     { href: "/about", label: pick(NAV_DICT.about, lang) },
     { href: "/membership", label: pick(NAV_DICT.membership, lang) },
     { href: "/professional-development", label: pick(NAV_DICT.training, lang) },
-    { href: "/laboratories", label: pick(NAV_DICT.search, lang) },
+    { href: "/laboratories", label: pick(NAV_DICT.registry, lang) },
     { href: "/career", label: pick(NAV_DICT.career, lang) },
     { href: "/news", label: pick(NAV_DICT.news, lang) },
     { href: "/contact", label: pick(NAV_DICT.contact, lang) },
@@ -125,10 +124,6 @@ export function NavBar() {
           ))}
         </nav>
 
-        <div className="hidden sm:block">
-          <SearchOverlay />
-        </div>
-
         <LangPill />
 
         {user ? (
@@ -179,9 +174,6 @@ export function NavBar() {
 
       {mobileOpen && (
         <div className="px-8 py-4 lg:hidden" style={{ borderTop: "1px solid var(--uz-border)" }}>
-          <div className="mb-4 sm:hidden">
-            <SearchOverlay />
-          </div>
           <nav className="flex flex-col gap-3">
             {links.map((link) => (
               <NavLink key={link.href} {...link} />

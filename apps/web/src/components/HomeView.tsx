@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useLang, pick } from "@/lib/i18n";
-import { SearchBar } from "@/components/SearchBar";
 import { EmptyStateSection } from "@/components/EmptyStateSection";
 
 interface NewsArticle {
@@ -144,10 +143,7 @@ export function HomeView({ news }: { news: NewsArticle[] }) {
           <p className="mt-3.5 max-w-[620px] text-lg leading-relaxed" style={{ color: "#B9C6DC" }}>
             {t("heroSub")}
           </p>
-          <div className="mt-8 max-w-lg">
-            <SearchBar />
-          </div>
-          <div className="mt-6 flex flex-wrap gap-3.5">
+          <div className="mt-8 flex flex-wrap gap-3.5">
             <Link
               href="/membership/apply"
               className="rounded-md px-7 text-base font-semibold text-white"
