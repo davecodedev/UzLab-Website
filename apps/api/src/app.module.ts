@@ -8,6 +8,7 @@ import { LaboratoriesModule } from './modules/laboratories/laboratories.module.j
 import { SearchModule } from './modules/search/search.module.js';
 import { HealthModule } from './modules/health/health.module.js';
 import { ImportsModule } from './modules/imports/imports.module.js';
+import { ClaimsModule } from './modules/claims/claims.module.js';
 
 // RolesGuard is intentionally NOT global here: Nest runs global guards
 // (APP_GUARD) before any route-level @UseGuards(), so a global RolesGuard
@@ -25,6 +26,7 @@ import { ImportsModule } from './modules/imports/imports.module.js';
     SearchModule,
     HealthModule,
     ImportsModule,
+    ClaimsModule,
   ],
 })
 export class AppModule {}

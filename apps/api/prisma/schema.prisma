@@ -35,6 +35,7 @@ model User {
   member                 Member?
   membershipApplications MembershipApplication[]
   contactSubmissions     ContactSubmission[]
+  laboratoryClaims       LaboratoryClaim[]
 
   @@index([deletedAt])
 }
@@ -224,6 +225,9 @@ model Laboratory {
   lastSeenAt    DateTime?
   disappearedAt DateTime?
 
+  claims  LaboratoryClaim[]
+  profile LaboratoryProfile?
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -237,6 +241,80 @@ model Laboratory {
   @@index([taxId])
   @@index([register])
   @@index([disappearedAt])
+}
+
+// --- Member-owned laboratory data ------------------------------------------
+// The register rows in Laboratory are overwritten wholesale on every refresh,
+// so nothing a member types may live in them — it would be silently erased by
+// the next import. Member contributions live here instead, in their own table,
+// and the UI falls back to the register's value when a field is blank.
+//
+// Official facts (name, number, accreditation status, dates, certificates)
+// are deliberately absent: those are determinations by the accreditation body,
+// not something a laboratory may restate about itself.
+
+enum ClaimStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+/// A member asserting they represent a laboratory. Approval is manual — being
+/// able to edit a public register entry is not something to hand out on the
+/// strength of a self-service form.
+model LaboratoryClaim {
+  id           String      @id @default(uuid())
+  userId       String
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  laboratoryId String
+  laboratory   Laboratory  @relation(fields: [laboratoryId], references: [id], onDelete: Cascade)
+  status       ClaimStatus @default(PENDING)
+
+  /// How the claimant says they can be verified — role, work email, phone.
+  evidence     String
+  contactName  String
+  contactEmail String
+  contactPhone String?
+
+  reviewedByUserId String?
+  reviewedAt       DateTime?
+  reviewNote       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// One claim per user per laboratory; re-applying updates the existing row.
+  @@unique([userId, laboratoryId])
+  @@index([status])
+  @@index([laboratoryId])
+}
+
+/// Supplementary, member-supplied detail for one laboratory. Every field is
+/// optional and additive — none of it contradicts the register.
+model LaboratoryProfile {
+  id           String     @id @default(uuid())
+  laboratoryId String     @unique
+  laboratory   Laboratory @relation(fields: [laboratoryId], references: [id], onDelete: Cascade)
+
+  /// Contact details the lab would rather publish than the register's.
+  publicPhone   String?
+  publicEmail   String?
+  publicWebsite String?
+  contactPerson String?
+
+  /// Free-text presentation.
+  description  String?
+  servicesText String?
+  workingHours String?
+
+  /// Capabilities the lab wants to be found by, beyond the official scope.
+  specialisations String[] @default([])
+
+  logoUrl String?
+
+  updatedByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 // --- Import auditing -------------------------------------------------------

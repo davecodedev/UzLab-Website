@@ -46,6 +46,9 @@ export class LaboratoriesService {
   async getBySlug(slug: string) {
     const lab = await this.prisma.laboratory.findFirst({
       where: { slug, deletedAt: null, isPublished: true },
+      // Member-supplied detail travels with the record; the page shows it
+      // alongside the register's own data rather than replacing it.
+      include: { profile: true },
     });
     if (!lab) {
       throw new NotFoundException('Laboratory not found');
