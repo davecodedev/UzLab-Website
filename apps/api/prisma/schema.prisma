@@ -217,6 +217,13 @@ model Laboratory {
   scopeText            String? // full scope table as plain text
   directions           String[]            @default([]) // industry sectors covered
 
+  // Source lifecycle. A scheduled re-import refreshes every row it still finds
+  // upstream; rows the source has stopped listing keep their data but get
+  // stamped `disappearedAt` rather than being deleted, so a bad scrape can
+  // never silently erase the register.
+  lastSeenAt    DateTime?
+  disappearedAt DateTime?
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -229,6 +236,44 @@ model Laboratory {
   @@index([isLaboratory])
   @@index([taxId])
   @@index([register])
+  @@index([disappearedAt])
+}
+
+// --- Import auditing -------------------------------------------------------
+// Every scheduled refresh writes one row here, including the runs that refused
+// to write. Without this a scrape that breaks and imports plausible-but-wrong
+// data looks identical to a healthy one.
+
+enum ImportRunStatus {
+  SUCCESS
+  NO_CHANGES // change detection found nothing new; full crawl skipped
+  REFUSED // sanity checks failed — nothing was written
+  FAILED // crawl or write errored out
+}
+
+model ImportRun {
+  id       String           @id @default(uuid())
+  register NationalRegister
+  status   ImportRunStatus
+  trigger  String           @default("manual") // "cron" | "manual"
+
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  durationMs Int?
+
+  // Counts. `scraped` is what the source offered; the rest is what we did.
+  scraped       Int @default(0)
+  created       Int @default(0)
+  updated       Int @default(0)
+  disappeared   Int @default(0)
+  reappeared    Int @default(0)
+  fetchFailures Int @default(0)
+
+  message  String? // refusal reason or short human summary
+  warnings String[] @default([])
+
+  @@index([register, startedAt])
+  @@index([startedAt])
 }
 
 // --- Media & Contact -----------------------------------------------------

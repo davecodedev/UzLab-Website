@@ -29,6 +29,12 @@ import {
   NationalRegister,
 } from '@prisma/client';
 import { slugify } from '../src/common/utils/slugify';
+import {
+  recordNoChanges,
+  runImport,
+  type ScrapeResult,
+  type ScrapedRecord,
+} from './lib/safe-import';
 
 const BASE = 'https://approval.depstan.uz';
 const CONCURRENCY = 8;
@@ -242,13 +248,46 @@ async function pageThrough(
   });
 }
 
+// --- change detection ------------------------------------------------------
+
+/**
+ * A full crawl is ~2,700 requests and several minutes, which is far too much to
+ * repeat when nothing upstream has moved. Page 1 is sorted newest-first, so the
+ * newest registry number plus the total page count is a cheap fingerprint: if
+ * both match what we already hold, the register is unchanged.
+ */
+async function looksUnchanged(prisma: PrismaClient): Promise<string | null> {
+  const html = await getHtml(`${BASE}/?page=1`);
+  if (!html) return null;
+
+  const rows = parseListPage(html);
+  const newest = rows[0]?.number;
+  const pages = lastPageNumber(html);
+  if (!newest) return null;
+
+  const [known, mostRecent] = await Promise.all([
+    prisma.laboratory.count({
+      where: { register: NationalRegister.DEPSTAN, disappearedAt: null },
+    }),
+    prisma.laboratory.findFirst({
+      where: { register: NationalRegister.DEPSTAN, disappearedAt: null },
+      orderBy: { accreditationNumber: 'desc' },
+      select: { accreditationNumber: true },
+    }),
+  ]);
+
+  // 10 rows per page; the last page is partial, so allow that slack.
+  const expectedPages = Math.ceil(known / 10);
+  if (mostRecent?.accreditationNumber === newest && Math.abs(pages - expectedPages) <= 1) {
+    return `Newest record is still ${newest} across ${pages} pages — register unchanged, skipping crawl.`;
+  }
+  return null;
+}
+
 // --- main ------------------------------------------------------------------
 
-async function main() {
-  const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
-  const prisma = new PrismaClient({ adapter });
-
-  try {
+async function scrape(): Promise<ScrapeResult> {
+  {
     // Phase 1 — region is only discoverable through the region filter.
     console.log('Mapping regions via the 14 region filters...');
     const regionByCode = new Map<string, string>();
@@ -284,11 +323,9 @@ async function main() {
       return html ? parseDetailPage(html) : {};
     });
 
-    // Phase 4 — persist.
-    console.log('\nWriting to database...');
-    let created = 0;
-    let updated = 0;
-    let skipped = 0;
+    // Phase 4 — assemble.
+    const records: ScrapedRecord[] = [];
+    let withRegion = 0;
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
@@ -296,7 +333,6 @@ async function main() {
       const number = clean(d.number) ?? clean(row.number);
       const name = clean(d.name) ?? clean(row.name);
       if (!number || !name) {
-        skipped++;
         continue;
       }
 
@@ -335,34 +371,41 @@ async function main() {
         scopeUrl: clean(d.scopeUrl),
       };
 
-      const existing = await prisma.laboratory.findUnique({
-        where: { accreditationNumber: number },
+      if (data.region) withRegion++;
+      records.push({
+        accreditationNumber: number,
+        slug: slugify(`${number}-${name}`),
+        data,
       });
+    }
 
-      if (existing) {
-        await prisma.laboratory.update({ where: { id: existing.id }, data });
-        updated++;
-      } else {
-        await prisma.laboratory.create({
-          data: {
-            ...data,
-            accreditationNumber: number,
-            slug: slugify(`${number}-${name}`),
-          },
-        });
-        created++;
+    return {
+      records,
+      fetchFailures: failedUrls,
+      regionCoverage: records.length ? withRegion / records.length : 0,
+    };
+  }
+}
+
+async function main() {
+  const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
+  const prisma = new PrismaClient({ adapter });
+  const trigger = process.env.IMPORT_TRIGGER ?? 'manual';
+  const force = process.argv.includes('--force');
+  const skipChangeCheck = force || process.argv.includes('--full');
+
+  try {
+    if (!skipChangeCheck) {
+      const unchanged = await looksUnchanged(prisma);
+      if (unchanged) {
+        await recordNoChanges(prisma, NationalRegister.DEPSTAN, trigger, unchanged);
+        return;
       }
     }
 
-    const depstan = await prisma.laboratory.count({
-      where: { register: NationalRegister.DEPSTAN },
-    });
-    const akkred = await prisma.laboratory.count({
-      where: { register: NationalRegister.AKKRED },
-    });
-    console.log(
-      `\nDone. Created: ${created}, updated: ${updated}, skipped: ${skipped}.` +
-        `\nIn database: ${depstan} Depstan + ${akkred} O'zAkk = ${await prisma.laboratory.count()} total.`,
+    await runImport(
+      { prisma, register: NationalRegister.DEPSTAN, trigger, force },
+      scrape,
     );
     if (failedUrls.length) {
       console.warn(

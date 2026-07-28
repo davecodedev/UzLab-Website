@@ -28,6 +28,7 @@ import {
   NationalRegister,
 } from '@prisma/client';
 import { slugify } from '../src/common/utils/slugify';
+import { runImport, type ScrapeResult, type ScrapedRecord } from './lib/safe-import';
 
 const API = 'https://api-e.akkred.uz/apps/registries';
 
@@ -167,36 +168,32 @@ async function fetchLookup(path: string): Promise<Map<number, string>> {
 
 // --- Main ------------------------------------------------------------------
 
-async function main() {
-  const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
-  const prisma = new PrismaClient({ adapter });
+async function scrape(): Promise<ScrapeResult> {
+  const records: ScrapedRecord[] = [];
 
-  let created = 0;
-  let updated = 0;
-  let skipped = 0;
+  console.log('Fetching reference data...');
+  const [regions, directions] = await Promise.all([
+    fetchLookup('region'),
+    fetchLookup('directions'),
+  ]);
+  console.log(`  ${regions.size} regions, ${directions.size} directions`);
 
-  try {
-    console.log('Fetching reference data...');
-    const [regions, directions] = await Promise.all([
-      fetchLookup('region'),
-      fetchLookup('directions'),
-    ]);
-    console.log(`  ${regions.size} regions, ${directions.size} directions`);
+  console.log('Fetching register...');
+  const page = await getJson<Paginated<RegistryRecord>>(
+    `${API}/main/?page=1&page_size=2000`,
+  );
+  console.log(`  ${page.results.length} of ${page.count} records`);
+  if (page.next) {
+    throw new Error('Register did not fit in one page — pagination needed.');
+  }
 
-    console.log('Fetching register...');
-    const page = await getJson<Paginated<RegistryRecord>>(
-      `${API}/main/?page=1&page_size=2000`,
-    );
-    console.log(`  ${page.results.length} of ${page.count} records`);
-    if (page.next) {
-      throw new Error('Register did not fit in one page — pagination needed.');
-    }
+  let withRegion = 0;
 
-    for (const row of page.results) {
+  for (const row of page.results) {
+    {
       const number = clean(row.number);
       const name = clean(row.title_organ) ?? clean(row.legal_entity_name);
       if (!number || !name) {
-        skipped++;
         continue;
       }
 
@@ -243,27 +240,32 @@ async function main() {
           .filter((d): d is string => Boolean(d)),
       };
 
-      const existing = await prisma.laboratory.findUnique({
-        where: { accreditationNumber: number },
+      if (data.region) withRegion++;
+      records.push({
+        accreditationNumber: number,
+        slug: slugify(`${number}-${name}`),
+        data,
       });
-
-      if (existing) {
-        // Keep the established slug — it's already in published URLs.
-        await prisma.laboratory.update({ where: { id: existing.id }, data });
-        updated++;
-      } else {
-        await prisma.laboratory.create({
-          data: { ...data, accreditationNumber: number, slug: slugify(`${number}-${name}`) },
-        });
-        created++;
-      }
     }
+  }
 
-    const labs = await prisma.laboratory.count({ where: { isLaboratory: true } });
-    const total = await prisma.laboratory.count();
-    console.log(
-      `\nDone. Created: ${created}, updated: ${updated}, skipped: ${skipped}.` +
-        `\nIn database: ${total} bodies (${labs} laboratories).`,
+  return {
+    records,
+    fetchFailures: [],
+    regionCoverage: records.length ? withRegion / records.length : 0,
+  };
+}
+
+async function main() {
+  const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
+  const prisma = new PrismaClient({ adapter });
+  const trigger = process.env.IMPORT_TRIGGER ?? 'manual';
+  const force = process.argv.includes('--force');
+
+  try {
+    await runImport(
+      { prisma, register: NationalRegister.AKKRED, trigger, force },
+      scrape,
     );
   } finally {
     await prisma.$disconnect();

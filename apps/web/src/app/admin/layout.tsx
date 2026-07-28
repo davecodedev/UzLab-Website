@@ -12,6 +12,7 @@ const ADMIN_LINKS = [
   { href: "/admin/laboratories", label: "Laboratories" },
   { href: "/admin/news", label: "News" },
   { href: "/admin/contact", label: "Contact & Feedback" },
+  { href: "/admin/imports", label: "Register imports" },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
