@@ -36,6 +36,7 @@ model User {
   membershipApplications MembershipApplication[]
   contactSubmissions     ContactSubmission[]
   laboratoryClaims       LaboratoryClaim[]
+  submittedLaboratories  Laboratory[]            @relation("SubmittedLaboratories")
 
   @@index([deletedAt])
 }
@@ -224,6 +225,20 @@ model Laboratory {
   // never silently erase the register.
   lastSeenAt    DateTime?
   disappearedAt DateTime?
+
+  // Member-submitted entries: laboratories that appear in neither national
+  // register and were added through the site. They carry the same fields as
+  // scraped rows so they are findable through exactly the same filters, but
+  // `source` keeps them honestly distinguishable — their data is self-declared,
+  // not verified against a register. They stay unpublished until staff approve.
+  //
+  // The scheduled imports cannot touch these: every import scopes its writes
+  // and its disappeared-marking to a single `register`, and these have none.
+  submittedByUserId String?
+  submittedBy       User?     @relation("SubmittedLaboratories", fields: [submittedByUserId], references: [id], onDelete: SetNull)
+  submittedAt       DateTime?
+  reviewedAt        DateTime?
+  reviewNote        String?
 
   claims  LaboratoryClaim[]
   profile LaboratoryProfile?

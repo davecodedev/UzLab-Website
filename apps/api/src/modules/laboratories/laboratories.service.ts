@@ -1,8 +1,18 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { ConformityBodyType, Prisma } from '@prisma/client';
+
+/** Body types that count as laboratories — mirrors the importers. */
+const LABORATORY_BODY_TYPES = new Set<ConformityBodyType>([
+  ConformityBodyType.TESTING_LAB,
+  ConformityBodyType.METROLOGY_SERVICE,
+  ConformityBodyType.CALIBRATION_LAB,
+  ConformityBodyType.NDT_LAB,
+  ConformityBodyType.MEDICAL_LAB,
+]);
 import { PrismaService } from '../../common/prisma/prisma.service.js';
 import { slugify } from '../../common/utils/slugify.js';
 import { ListLaboratoriesDto } from './dto/list-laboratories.dto.js';
+import { SubmitLaboratoryDto, ReviewSubmissionDto } from './dto/submit-laboratory.dto.js';
 import { CreateLaboratoryDto } from './dto/create-laboratory.dto.js';
 import { UpdateLaboratoryDto } from './dto/update-laboratory.dto.js';
 
@@ -117,6 +127,98 @@ export class LaboratoriesService {
         isPublished: dto.isPublished,
       },
     });
+  }
+
+  // --- Member submissions ---------------------------------------------------
+
+  /**
+   * Creates a laboratory supplied by a member. It is held back from the public
+   * registry until staff approve it — an unmoderated public register of
+   * accreditation data is too easy to pollute.
+   */
+  async submit(userId: string, dto: SubmitLaboratoryDto) {
+    if (dto.accreditationNumber) {
+      const clash = await this.prisma.laboratory.findUnique({
+        where: { accreditationNumber: dto.accreditationNumber },
+        select: { id: true },
+      });
+      if (clash) {
+        throw new ConflictException(
+          `Registry number "${dto.accreditationNumber}" already exists. If this is your laboratory, claim the existing entry instead of adding a new one.`,
+        );
+      }
+    }
+
+    const slug = await this.uniqueSlug(slugify(dto.name));
+    const { accreditationDate, accreditedUntil, ...rest } = dto;
+
+    return this.prisma.laboratory.create({
+      data: {
+        ...rest,
+        slug,
+        accreditationDate: accreditationDate ? new Date(accreditationDate) : undefined,
+        accreditedUntil: accreditedUntil ? new Date(accreditedUntil) : undefined,
+        fields: dto.fields ?? [],
+        directions: dto.directions ?? [],
+        isLaboratory: LABORATORY_BODY_TYPES.has(dto.bodyType),
+        source: 'SELF_REGISTERED',
+        // No register: these are not in akkred.uz or approval.depstan.uz, which
+        // is also what keeps the scheduled imports from ever touching them.
+        register: null,
+        isPublished: false,
+        submittedByUserId: userId,
+        submittedAt: new Date(),
+      },
+    });
+  }
+
+  /** Member-submitted entries awaiting a staff decision. */
+  listPendingSubmissions() {
+    return this.prisma.laboratory.findMany({
+      where: { source: 'SELF_REGISTERED', isPublished: false, deletedAt: null },
+      orderBy: { submittedAt: 'asc' },
+      include: { submittedBy: { select: { id: true, email: true, fullName: true } } },
+    });
+  }
+
+  listMySubmissions(userId: string) {
+    return this.prisma.laboratory.findMany({
+      where: { submittedByUserId: userId, deletedAt: null },
+      orderBy: { submittedAt: 'desc' },
+    });
+  }
+
+  async reviewSubmission(id: string, dto: ReviewSubmissionDto) {
+    const lab = await this.prisma.laboratory.findFirst({
+      where: { id, source: 'SELF_REGISTERED', deletedAt: null },
+    });
+    if (!lab) throw new NotFoundException('Submission not found');
+
+    // Rejection keeps the row (so the submitter can see the note and it is not
+    // silently lost) but soft-deletes it out of every listing.
+    return this.prisma.laboratory.update({
+      where: { id },
+      data: {
+        isPublished: dto.approve,
+        reviewNote: dto.reviewNote,
+        reviewedAt: new Date(),
+        deletedAt: dto.approve ? null : new Date(),
+      },
+    });
+  }
+
+  /** Appends a counter until the slug is free — member names collide far more than registry numbers do. */
+  private async uniqueSlug(base: string): Promise<string> {
+    let candidate = base;
+    for (let i = 2; i < 100; i++) {
+      const taken = await this.prisma.laboratory.findUnique({
+        where: { slug: candidate },
+        select: { id: true },
+      });
+      if (!taken) return candidate;
+      candidate = `${base}-${i}`;
+    }
+    throw new ConflictException('Could not generate a unique address for this name.');
   }
 
   async softDelete(id: string) {
