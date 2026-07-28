@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useLang, pick } from "@/lib/i18n";
 import { EmptyStateSection } from "@/components/EmptyStateSection";
+import { MembershipCta } from "@/components/MembershipCta";
 
 interface NewsArticle {
   id: string;
@@ -131,13 +132,11 @@ export function HomeView({ news }: { news: NewsArticle[] }) {
             {t("heroSub")}
           </p>
           <div className="mt-8 flex flex-wrap gap-3.5">
-            <Link
-              href="/membership/apply"
-              className="rounded-md px-7 text-base font-semibold text-white"
-              style={{ height: 52, lineHeight: "52px", background: "var(--uz-blue-600)" }}
-            >
-              {t("joinCta")}
-            </Link>
+            <MembershipCta
+              variant="button"
+              buttonClassName="rounded-md px-7 text-base font-semibold text-white"
+              buttonStyle={{ height: 52, lineHeight: "52px", background: "var(--uz-blue-600)" }}
+            />
           </div>
         </div>
       </div>
@@ -320,13 +319,11 @@ export function HomeView({ news }: { news: NewsArticle[] }) {
             <p className="mb-4 text-[13.5px] leading-relaxed" style={{ color: "#B9C6DC" }}>
               {t("joinBody")}
             </p>
-            <Link
-              href="/membership/apply"
-              className="inline-block rounded-md px-[18px] text-sm font-semibold text-white"
-              style={{ height: 40, lineHeight: "40px", background: "var(--uz-blue-600)" }}
-            >
-              {t("joinCta")}
-            </Link>
+            <MembershipCta
+              variant="button"
+              buttonClassName="inline-block rounded-md px-[18px] text-sm font-semibold text-white"
+              buttonStyle={{ height: 40, lineHeight: "40px", background: "var(--uz-blue-600)" }}
+            />
           </div>
         </div>
       </div>

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, ApiError } from "@/lib/api";
-import { getAccessToken } from "@/lib/auth-client";
+import { getAccessToken, getStoredUser, isStaff } from "@/lib/auth-client";
 import { useLang, pick, type Lang } from "@/lib/i18n";
 import { REGISTER_SHORT, type ClaimStatus, type MyClaim } from "@/lib/claims";
 import { submissionState, type MySubmission, type SubmissionState } from "@/lib/submissions";
@@ -74,6 +74,28 @@ const UI = {
     ru: "Если лаборатории нет ни в реестре O'zAkk, ни в реестре Depstan.",
     uz: "Agar laboratoriya na O'zAkk, na Depstan reyestrida bo'lmasa.",
     en: "For a laboratory that is in neither the O'zAkk nor the Depstan register.",
+  },
+
+  // --- Staff --------------------------------------------------------------
+  staffTitle: {
+    ru: "Вы вошли как сотрудник",
+    uz: "Siz xodim sifatida kirgansiz",
+    en: "You are signed in as staff",
+  },
+  staffBody: {
+    ru: "Лаборатории добавляются и редактируются в панели администратора, а заявки участников — в очереди на проверку.",
+    uz: "Laboratoriyalar administrator panelida qo'shiladi va tahrirlanadi, ishtirokchilar arizalari esa tekshiruv navbatida ko'rib chiqiladi.",
+    en: "Laboratories are added and edited in the admin panel, and member submissions are handled in the review queue.",
+  },
+  staffManageCta: {
+    ru: "Лаборатории в админке",
+    uz: "Admin paneldagi laboratoriyalar",
+    en: "Manage laboratories",
+  },
+  staffReviewCta: {
+    ru: "Заявки на добавление",
+    uz: "Qo'shish arizalari",
+    en: "Review submissions",
   },
 
   claimsHeading: {
@@ -179,6 +201,7 @@ export default function AccountPage() {
   const [error, setError] = useState<string | null>(null);
   const [submissions, setSubmissions] = useState<MySubmission[] | null>(null);
   const [submissionsError, setSubmissionsError] = useState<string | null>(null);
+  const [staff, setStaff] = useState(false);
 
   useEffect(() => {
     const token = getAccessToken();
@@ -186,6 +209,7 @@ export default function AccountPage() {
       router.push("/login?next=/account");
       return;
     }
+    setStaff(isStaff(getStoredUser()));
     api
       .get<MyClaim[]>("/claims/mine", token)
       .then(setClaims)
@@ -230,18 +254,51 @@ export default function AccountPage() {
         {t("intro")}
       </p>
 
-      <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2">
-        <Link
-          href="/account/laboratories/new"
-          className="inline-flex h-11 items-center rounded-md px-5 text-sm font-semibold text-white"
-          style={{ background: "var(--uz-blue-600)" }}
+      {staff ? (
+        // Staff maintain the register through the admin panel and review these
+        // very submissions, so offering them the member submission form would
+        // just route them the long way round to their own queue.
+        <div
+          className="mt-6 rounded-xl p-5"
+          style={{ border: "1px solid var(--uz-border)", background: "var(--uz-blue-50)" }}
         >
-          {t("addCta")}
-        </Link>
-        <span className="text-sm" style={{ color: "var(--uz-text-faint)" }}>
-          {t("addCtaHint")}
-        </span>
-      </div>
+          <p className="text-[15px] font-bold" style={{ color: "var(--uz-navy-900)" }}>
+            {t("staffTitle")}
+          </p>
+          <p className="mt-1 text-[14px]" style={{ color: "var(--uz-text-muted)" }}>
+            {t("staffBody")}
+          </p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Link
+              href="/admin/laboratories"
+              className="inline-flex h-10 items-center rounded-md px-4 text-sm font-semibold text-white"
+              style={{ background: "var(--uz-blue-600)" }}
+            >
+              {t("staffManageCta")}
+            </Link>
+            <Link
+              href="/admin/laboratory-submissions"
+              className="inline-flex h-10 items-center rounded-md px-4 text-sm font-semibold"
+              style={{ border: "1px solid var(--uz-border-strong)", color: "var(--uz-navy-900)" }}
+            >
+              {t("staffReviewCta")}
+            </Link>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2">
+          <Link
+            href="/account/laboratories/new"
+            className="inline-flex h-11 items-center rounded-md px-5 text-sm font-semibold text-white"
+            style={{ background: "var(--uz-blue-600)" }}
+          >
+            {t("addCta")}
+          </Link>
+          <span className="text-sm" style={{ color: "var(--uz-text-faint)" }}>
+            {t("addCtaHint")}
+          </span>
+        </div>
+      )}
 
       <h2
         className="mt-12 text-xs font-semibold uppercase tracking-wider"

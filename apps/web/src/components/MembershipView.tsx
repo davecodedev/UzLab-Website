@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useLang, pick, type Lang } from "@/lib/i18n";
+import { MembershipCta } from "@/components/MembershipCta";
 
 export interface MembershipType {
   id: string;
@@ -192,13 +192,7 @@ export function MembershipView({
             {t("pageSub")}
           </p>
         </div>
-        <Link
-          href="/membership/apply"
-          className="inline-flex h-11 shrink-0 items-center rounded-md px-5 text-sm font-semibold text-white transition-colors"
-          style={{ background: "var(--uz-blue-600)" }}
-        >
-          {t("applyCta")}
-        </Link>
+        <MembershipCta className="shrink-0 sm:max-w-sm" />
       </div>
 
       {/* MEMBERSHIP TYPES */}
