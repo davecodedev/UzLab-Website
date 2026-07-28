@@ -161,8 +161,29 @@ enum AccreditationStatus {
   ACCREDITED
   SUSPENDED
   EXPIRED
+  WITHDRAWN
   PENDING
   UNKNOWN
+}
+
+// The national register covers more than laboratories — it also lists
+// certification bodies, inspection bodies, proficiency-testing providers and
+// reference-material producers. Keyed by O'zAkk's own `type_std.key` so the
+// mapping back to the source stays exact.
+enum ConformityBodyType {
+  TESTING_LAB // SL — Sinov laboratoriyasi
+  METROLOGY_SERVICE // QL — o'lchash vositalarini qiyoslash metrologiya xizmati
+  CALIBRATION_LAB // KL — Kalibrlash laboratoriyasi
+  NDT_LAB // PT — putur yetkazmasdan tekshirish laboratoriyasi
+  MEDICAL_LAB // TL — Tibbiy laboratoriya
+  PRODUCT_CERTIFICATION // MS — Mahsulot sertifikatlash organi
+  MANAGEMENT_CERTIFICATION // MT — Menejment tizimlarini sertifikatlashtirish organi
+  SERVICE_CERTIFICATION // XO — Xizmatlarni sertifikatlash organi
+  PERSONNEL_CERTIFICATION // XS — Xodimlarni sertifikatlashtirish organi
+  INSPECTION_BODY // IO — Inspeksiya organlari
+  PROFICIENCY_PROVIDER // MP — Malakani tekshirish provayderlari
+  REFERENCE_MATERIAL_PRODUCER // SN — Standart namunalar ishlab chiqaruvchi
+  OTHER_BODY
 }
 
 // Where a record came from — matters once bulk government-sourced imports
@@ -193,14 +214,38 @@ model Laboratory {
   isUzLabMember       Boolean             @default(false)
   isPublished         Boolean             @default(true)
   source              LaboratorySource    @default(MANUAL_ENTRY)
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
-  deletedAt           DateTime?
+
+  // --- National register detail (O'zAkk / akkred.uz) --------------------
+  // Populated by scripts/import-akkred-registry.ts from the public register
+  // API. All optional: a self-registered lab has none of these.
+  bodyType             ConformityBodyType? // which kind of conformity-assessment body
+  bodyTypeLabel        String? // O'zAkk's own Uzbek label for the type
+  isLaboratory         Boolean             @default(true) // false for certification/inspection bodies
+  externalId           Int? // O'zAkk internal numeric id
+  externalUid          String? // O'zAkk uuid
+  legalEntityName      String? // parent legal entity (often differs from the body's own name)
+  legalEntityAddress   String? // registered legal address
+  supervisorName       String? // head of the laboratory / body
+  standard             String? // e.g. "O'z DSt ISO/IEC 17025:2019"
+  accreditationDate    DateTime? // first accreditation
+  reAccreditationDate  DateTime?
+  statusDate           DateTime? // date the current status took effect
+  certificateUrl       String? // accreditation certificate PDF (hosted by O'zAkk)
+  scopeUrl             String? // scope-of-accreditation PDF (hosted by O'zAkk)
+  scopeText            String? // full scope table as plain text
+  directions           String[]            @default([]) // industry sectors covered
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@index([region])
   @@index([accreditationStatus])
   @@index([isPublished])
   @@index([deletedAt])
+  @@index([bodyType])
+  @@index([isLaboratory])
+  @@index([taxId])
 }
 
 // --- Media & Contact -----------------------------------------------------

@@ -25,7 +25,14 @@ export class LaboratoriesService {
       }),
     };
 
-    return this.prisma.laboratory.findMany({ where, orderBy: { name: 'asc' } });
+    // scopeText holds each body's full scope-of-accreditation table — ~10.5 MB
+    // across the register, with single records over 300 KB. It's only ever
+    // rendered on a detail page, so it stays out of list responses.
+    return this.prisma.laboratory.findMany({
+      where,
+      orderBy: { name: 'asc' },
+      omit: { scopeText: true },
+    });
   }
 
   // Staff-only: includes unpublished entries, unlike the public list().

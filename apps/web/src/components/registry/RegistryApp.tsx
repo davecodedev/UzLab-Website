@@ -4,14 +4,14 @@ import Link from "next/link";
 import { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import { useLang, type Lang } from "@/lib/i18n";
 import {
+  BODY_TYPE_OPTIONS,
   EMPTY_FILTERS,
-  FIELD_OPTIONS,
   REGION_OPTIONS,
   STATUS_OPTIONS,
   UNSPECIFIED_REGION,
   UNSPECIFIED_REGION_LABEL,
+  bodyTypeLabel,
   composeFilterLabel,
-  fieldLabel,
   hasActiveFilters,
   matches,
   regionLabel,
@@ -54,13 +54,14 @@ const REG_VARS = {
   "--reg-font-mono": "'IBM Plex Mono', monospace",
 } as React.CSSProperties;
 
-const STATUS_ORDER = ["ACCREDITED", "PENDING", "SUSPENDED", "EXPIRED"];
+const STATUS_ORDER = ["ACCREDITED", "PENDING", "SUSPENDED", "EXPIRED", "WITHDRAWN"];
 
 const STATUS_PILL_STYLE: Record<string, React.CSSProperties> = {
   ACCREDITED: { background: "var(--reg-blue)", color: "#fff", border: "1px solid var(--reg-blue)" },
   PENDING: { background: "#fff", color: "var(--reg-blue)", border: "1px solid var(--reg-blue)" },
   SUSPENDED: { background: "#fff", color: "var(--reg-gray-1)", border: "1px solid var(--reg-gray-4)" },
   EXPIRED: { background: "var(--reg-gray-5)", color: "var(--reg-gray-1)", border: "1px solid var(--reg-gray-4)" },
+  WITHDRAWN: { background: "var(--reg-gray-2)", color: "#fff", border: "1px solid var(--reg-gray-2)" },
   UNKNOWN: { background: "var(--reg-panel)", color: "var(--reg-gray-2)", border: "1px solid var(--reg-border)" },
 };
 
@@ -70,16 +71,24 @@ const UI = {
   eyebrow: { ru: "Национальный реестр аккредитации", uz: "Milliy akkreditatsiya reyestri", en: "National Accreditation Register" },
   title: { ru: "Реестр лабораторий", uz: "Laboratoriyalar reyestri", en: "Laboratory registry" },
   subtitle: {
-    ru: "Поиск по реестру аккредитованных испытательных, калибровочных, медицинских и метрологических лабораторий Узбекистана.",
-    uz: "O'zbekistonning akkreditatsiyadan o'tgan sinov, kalibrlash, tibbiyot va metrologiya laboratoriyalari reyestri bo'yicha qidiruv.",
-    en: "Search the registry of accredited testing, calibration, medical and metrology laboratories of Uzbekistan.",
+    ru: "Поиск по национальному реестру аккредитованных органов по оценке соответствия Узбекистана: испытательных, калибровочных, медицинских и метрологических лабораторий, органов по сертификации и инспекции.",
+    uz: "O'zbekistonning muvofiqlikni baholash organlari milliy reyestri bo'yicha qidiruv: sinov, kalibrlash, tibbiyot va metrologiya laboratoriyalari, sertifikatlashtirish va inspeksiya organlari.",
+    en: "Search Uzbekistan's national register of accredited conformity-assessment bodies: testing, calibration, medical and metrology laboratories, certification and inspection bodies.",
   },
   filters: { ru: "Фильтры", uz: "Filtrlar", en: "Filters" },
   clearAll: { ru: "Очистить всё", uz: "Barchasini tozalash", en: "Clear all" },
   regNo: { ru: "Регистрационный номер", uz: "Ro'yxat raqami", en: "Registry number" },
   orgName: { ru: "Название организации", uz: "Tashkilot nomi", en: "Organization name" },
-  fieldType: { ru: "Тип органа", uz: "Turi", en: "Agency type" },
+  bodyType: { ru: "Тип органа", uz: "Organ turi", en: "Body type" },
   anyType: { ru: "Любой тип", uz: "Har qanday turi", en: "Any type" },
+  taxId: { ru: "ИНН (СТИР)", uz: "STIR", en: "TIN (STIR)" },
+  taxIdPlaceholder: { ru: "Поиск по ИНН…", uz: "STIR bo'yicha qidirish…", en: "Search by TIN…" },
+  labsOnly: { ru: "Только лаборатории", uz: "Faqat laboratoriyalar", en: "Laboratories only" },
+  labsOnlyHint: {
+    ru: "В реестре также есть органы по сертификации и инспекции",
+    uz: "Reyestrda sertifikatlashtirish va inspeksiya organlari ham bor",
+    en: "The register also lists certification and inspection bodies",
+  },
   region: { ru: "Регион", uz: "Hudud", en: "Region" },
   allRegions: { ru: "Все регионы", uz: "Barcha hududlar", en: "All regions" },
   regionsGroup: { ru: "— Регионы Узбекистана —", uz: "— O'zbekiston hududlari —", en: "— Regions of Uzbekistan —" },
@@ -91,8 +100,6 @@ const UI = {
   keywordsPlaceholder: { ru: "название, номер, тип…", uz: "nomi, raqami, turi…", en: "name, number, type…" },
   standardDoc: { ru: "Нормативный документ", uz: "Normativ hujjat", en: "Normative document" },
   standardDocPlaceholder: { ru: "напр. ISO/IEC 17025", uz: "masalan, ISO/IEC 17025", en: "e.g. ISO/IEC 17025" },
-  learningCentre: { ru: "Учебный центр", uz: "O'quv markazi", en: "Learning centre" },
-  learningCentrePlaceholder: { ru: "пока не отслеживается", uz: "hozircha kuzatilmaydi", en: "not tracked yet" },
   stakeholder: { ru: "Реестр участников", uz: "Ishtirokchilar reyestri", en: "Stakeholder registry" },
   stakeholderPlaceholder: {
     ru: "напр. организация или контакт",
@@ -123,15 +130,20 @@ const UI = {
   toastCsv: { ru: "Файл CSV скачан", uz: "CSV fayli yuklab olindi", en: "CSV file downloaded" },
   toastXlsx: { ru: "Файл XLSX скачан", uz: "XLSX fayli yuklab olindi", en: "XLSX file downloaded" },
   toastPdf: { ru: "Открыт диалог печати — выберите «Сохранить как PDF»", uz: "Chop etish oynasi ochildi — «PDF sifatida saqlash»ni tanlang", en: "Print dialog opened — choose \"Save as PDF\"" },
-  emptyTitle: { ru: "Лаборатории не найдены по этим фильтрам", uz: "Ushbu filtrlar bo'yicha laboratoriya topilmadi", en: "No laboratories match these filters" },
+  emptyTitle: { ru: "Записи не найдены по этим фильтрам", uz: "Ushbu filtrlar bo'yicha yozuv topilmadi", en: "No records match these filters" },
   emptyHint: { ru: "Попробуйте изменить или сбросить фильтры", uz: "Filtrlarni o'zgartirib yoki tozalab ko'ring", en: "Try adjusting or clearing your filters" },
   clearFiltersBtn: { ru: "Сбросить все фильтры", uz: "Barcha filtrlarni tozalash", en: "Clear all filters" },
   colRegNo: { ru: "Рег. №", uz: "Ro'yxat №", en: "Reg. No." },
   colOrg: { ru: "Организация", uz: "Tashkilot", en: "Organization" },
-  colType: { ru: "Тип", uz: "Turi", en: "Type" },
+  colType: { ru: "Тип органа", uz: "Organ turi", en: "Body type" },
+  colTaxId: { ru: "ИНН", uz: "STIR", en: "TIN" },
   colRegion: { ru: "Регион", uz: "Hudud", en: "Region" },
   colStatus: { ru: "Статус", uz: "Holat", en: "Status" },
   colBody: { ru: "Орган аккредитации", uz: "Akkreditatsiya organi", en: "Accreditation body" },
+  colStandard: { ru: "Нормативный документ", uz: "Normativ hujjat", en: "Normative document" },
+  colAddress: { ru: "Адрес", uz: "Manzil", en: "Address" },
+  colPhone: { ru: "Телефон", uz: "Telefon", en: "Phone" },
+  colEmail: { ru: "Эл. почта", uz: "E-pochta", en: "Email" },
   member: { ru: "Член UzLab", uz: "UzLab a'zosi", en: "UzLab member" },
 } as const;
 
@@ -264,20 +276,21 @@ export function RegistryApp({ laboratories }: { laboratories: Laboratory[] }) {
   const summarySentence = useMemo(() => {
     if (filtered.length === 0) return t("noResults", lang);
     const accredited = statusCounts.ACCREDITED ?? 0;
+    const labs = filtered.filter((l) => l.isLaboratory).length;
     if (regionsWithData.length === 0) {
       return {
-        ru: `${filtered.length} лабораторий найдено — регион пока не указан ни для одной из них — аккредитовано: ${accredited}`,
-        uz: `${filtered.length} ta laboratoriya topildi — ularning birortasi uchun ham hudud hali ko'rsatilmagan — akkreditatsiya qilingan: ${accredited}`,
-        en: `${filtered.length} laboratories found — region has not yet been recorded for any of them — accredited: ${accredited}`,
+        ru: `${filtered.length} записей, из них лабораторий: ${labs} — аккредитовано: ${accredited}`,
+        uz: `${filtered.length} ta yozuv, shundan laboratoriyalar: ${labs} — akkreditatsiya qilingan: ${accredited}`,
+        en: `${filtered.length} records, of which laboratories: ${labs} — accredited: ${accredited}`,
       }[lang];
     }
     const top = [...regionsWithData].sort((a, b) => b.count - a.count)[0];
     return {
-      ru: `${filtered.length} лабораторий в ${regionsWithData.length} регионах, больше всего в «${top.label}» (${top.count}) — аккредитовано: ${accredited}`,
-      uz: `${filtered.length} ta laboratoriya ${regionsWithData.length} ta hududda, eng ko'pi «${top.label}» (${top.count}) — akkreditatsiya qilingan: ${accredited}`,
-      en: `${filtered.length} laboratories across ${regionsWithData.length} regions, most in "${top.label}" (${top.count}) — accredited: ${accredited}`,
+      ru: `${filtered.length} записей в ${regionsWithData.length} регионах, больше всего в «${top.label}» (${top.count}) — лабораторий: ${labs}, аккредитовано: ${accredited}`,
+      uz: `${filtered.length} ta yozuv ${regionsWithData.length} ta hududda, eng ko'pi «${top.label}» (${top.count}) — laboratoriyalar: ${labs}, akkreditatsiya qilingan: ${accredited}`,
+      en: `${filtered.length} records across ${regionsWithData.length} regions, most in "${top.label}" (${top.count}) — laboratories: ${labs}, accredited: ${accredited}`,
     }[lang];
-  }, [filtered.length, regionsWithData, statusCounts, lang]);
+  }, [filtered, regionsWithData, statusCounts, lang]);
 
   const applyFilters = useCallback((f: RegistryFilters) => {
     setFilters(f);
@@ -541,21 +554,35 @@ function FiltersCard({
 
         <div>
           <label className={labelClass()} style={{ color: "var(--reg-gray-2)" }}>
-            {t("fieldType", lang)}
+            {t("bodyType", lang)}
           </label>
           <select
-            value={filters.fieldType}
-            onChange={(e) => updateFilter("fieldType", e.target.value)}
+            value={filters.bodyType}
+            onChange={(e) => updateFilter("bodyType", e.target.value)}
             className={`reg-select ${inputClass()}`}
             style={{ border: "1px solid var(--reg-border)" }}
           >
             <option value="">{t("anyType", lang)}</option>
-            {FIELD_OPTIONS.map((f) => (
-              <option key={f.value} value={f.value}>
-                {f.label[lang]}
+            {BODY_TYPE_OPTIONS.map((b) => (
+              <option key={b.value} value={b.value}>
+                {b.label[lang]}
               </option>
             ))}
           </select>
+        </div>
+
+        <div>
+          <label className={labelClass()} style={{ color: "var(--reg-gray-2)" }}>
+            {t("taxId", lang)}
+          </label>
+          <input
+            value={filters.taxId}
+            onChange={(e) => updateFilter("taxId", e.target.value)}
+            placeholder={t("taxIdPlaceholder", lang)}
+            inputMode="numeric"
+            className={`reg-mono ${inputClass()}`}
+            style={{ border: "1px solid var(--reg-border)" }}
+          />
         </div>
 
         <div>
@@ -640,19 +667,6 @@ function FiltersCard({
 
         <div>
           <label className={labelClass()} style={{ color: "var(--reg-gray-2)" }}>
-            {t("learningCentre", lang)}
-          </label>
-          <input
-            disabled
-            placeholder={t("learningCentrePlaceholder", lang)}
-            title={t("learningCentrePlaceholder", lang)}
-            className={inputClass()}
-            style={{ border: "1px solid var(--reg-border)", background: "var(--reg-panel)", cursor: "not-allowed" }}
-          />
-        </div>
-
-        <div>
-          <label className={labelClass()} style={{ color: "var(--reg-gray-2)" }}>
             {t("stakeholder", lang)}
           </label>
           <input
@@ -662,6 +676,22 @@ function FiltersCard({
             className={inputClass()}
             style={{ border: "1px solid var(--reg-border)" }}
           />
+        </div>
+
+        <div className="rounded-[7px] px-3 py-2.5" style={{ border: "1px solid var(--reg-border)", background: "var(--reg-panel)" }}>
+          <label className="flex cursor-pointer items-center gap-2 text-sm font-medium" style={{ color: "var(--reg-ink)" }}>
+            <input
+              type="checkbox"
+              checked={filters.labsOnly}
+              onChange={(e) => updateFilter("labsOnly", e.target.checked)}
+              className="reg-input h-4 w-4 flex-none cursor-pointer"
+              style={{ accentColor: "var(--reg-blue)" }}
+            />
+            {t("labsOnly", lang)}
+          </label>
+          <p className="mt-1 pl-6 text-[11px] leading-snug" style={{ color: "var(--reg-gray-2)" }}>
+            {t("labsOnlyHint", lang)}
+          </p>
         </div>
 
         <button
@@ -884,10 +914,10 @@ function StatusPill({ status, lang }: { status: string; lang: Lang }) {
 function TableView({ lang, laboratories }: { lang: Lang; laboratories: Laboratory[] }) {
   return (
     <div className="mt-4 overflow-x-auto rounded-[14px] bg-white" style={{ border: "1px solid var(--reg-border)" }}>
-      <table className="w-full min-w-[760px] border-collapse text-sm">
+      <table className="w-full min-w-[900px] border-collapse text-sm">
         <thead>
           <tr style={{ background: "var(--reg-panel)" }}>
-            {(["colRegNo", "colOrg", "colType", "colRegion", "colStatus"] as const).map((k) => (
+            {(["colRegNo", "colOrg", "colType", "colTaxId", "colRegion", "colStatus"] as const).map((k) => (
               <th
                 key={k}
                 className="reg-mono px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em]"
@@ -908,12 +938,22 @@ function TableView({ lang, laboratories }: { lang: Lang; laboratories: Laborator
                 <Link href={`/laboratories/${lab.slug}`} className="font-medium hover:underline" style={{ color: "var(--reg-ink)" }}>
                   {lab.name}
                 </Link>
-                <div className="mt-0.5 text-xs" style={{ color: "var(--reg-gray-3)" }}>
-                  {lab.fields.map((f) => fieldLabel(f, lang)).join(", ")}
-                </div>
+                {lab.legalEntityName && lab.legalEntityName !== lab.name && (
+                  <div className="mt-0.5 text-xs" style={{ color: "var(--reg-gray-3)" }}>
+                    {lab.legalEntityName}
+                  </div>
+                )}
+                {lab.standard && (
+                  <div className="reg-mono mt-0.5 text-[11px]" style={{ color: "var(--reg-gray-3)" }}>
+                    {lab.standard}
+                  </div>
+                )}
               </td>
               <td className="px-4 py-3 align-top" style={{ color: "var(--reg-gray-1)" }}>
-                {lab.fields.map((f) => fieldLabel(f, lang)).join(", ") || "—"}
+                {bodyTypeLabel(lab.bodyType, lang)}
+              </td>
+              <td className="reg-mono px-4 py-3 align-top whitespace-nowrap" style={{ color: "var(--reg-gray-1)" }}>
+                {lab.taxId ?? "—"}
               </td>
               <td className="px-4 py-3 align-top" style={{ color: "var(--reg-gray-1)" }}>
                 {regionLabel(lab.region, lang)}
@@ -930,6 +970,23 @@ function TableView({ lang, laboratories }: { lang: Lang; laboratories: Laborator
 }
 
 // --- Cards view ----------------------------------------------------------
+
+function CardRow({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="flex items-start justify-between gap-3 py-1.5" style={{ borderTop: "1px solid var(--reg-divider)" }}>
+      <dt className="flex-none" style={{ color: "var(--reg-gray-3)" }}>
+        {label}
+      </dt>
+      <dd
+        className={`min-w-0 break-words text-right ${mono ? "reg-mono" : ""}`}
+        style={{ color: "var(--reg-gray-1)" }}
+        title={value}
+      >
+        {value}
+      </dd>
+    </div>
+  );
+}
 
 function CardsView({ lang, laboratories }: { lang: Lang; laboratories: Laboratory[] }) {
   return (
@@ -958,25 +1015,17 @@ function CardsView({ lang, laboratories }: { lang: Lang; laboratories: Laborator
               {t("member", lang)}
             </span>
           )}
-          <dl className="mt-3 divide-y text-xs" style={{ borderColor: "var(--reg-divider)" }}>
-            <div className="flex items-center justify-between py-1.5" style={{ borderTop: "1px solid var(--reg-divider)" }}>
-              <dt style={{ color: "var(--reg-gray-3)" }}>{t("colType", lang)}</dt>
-              <dd className="text-right" style={{ color: "var(--reg-gray-1)" }}>
-                {lab.fields.map((f) => fieldLabel(f, lang)).join(", ") || "—"}
-              </dd>
-            </div>
-            <div className="flex items-center justify-between py-1.5" style={{ borderTop: "1px solid var(--reg-divider)" }}>
-              <dt style={{ color: "var(--reg-gray-3)" }}>{t("colRegion", lang)}</dt>
-              <dd className="text-right" style={{ color: "var(--reg-gray-1)" }}>
-                {regionLabel(lab.region, lang)}
-              </dd>
-            </div>
-            <div className="flex items-center justify-between py-1.5" style={{ borderTop: "1px solid var(--reg-divider)" }}>
-              <dt style={{ color: "var(--reg-gray-3)" }}>{t("colBody", lang)}</dt>
-              <dd className="truncate text-right" style={{ color: "var(--reg-gray-1)" }}>
-                {lab.accreditationBody ?? "—"}
-              </dd>
-            </div>
+          <dl className="mt-3 text-xs">
+            <CardRow label={t("colType", lang)} value={bodyTypeLabel(lab.bodyType, lang)} />
+            {lab.taxId && <CardRow label={t("colTaxId", lang)} value={lab.taxId} mono />}
+            <CardRow label={t("colRegion", lang)} value={regionLabel(lab.region, lang)} />
+            {lab.standard && <CardRow label={t("colStandard", lang)} value={lab.standard} mono />}
+            {lab.accreditationBody && <CardRow label={t("colBody", lang)} value={lab.accreditationBody} />}
+            {(lab.address ?? lab.legalEntityAddress) && (
+              <CardRow label={t("colAddress", lang)} value={(lab.address ?? lab.legalEntityAddress) as string} />
+            )}
+            {lab.phone && <CardRow label={t("colPhone", lang)} value={lab.phone} mono />}
+            {lab.email && <CardRow label={t("colEmail", lang)} value={lab.email} />}
           </dl>
         </Link>
       ))}
