@@ -3,6 +3,8 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { useLang, pick, type Lang } from "@/lib/i18n";
+import { LaboratoryClaimForm } from "@/components/LaboratoryClaimForm";
+import type { LaboratoryProfile } from "@/lib/claims";
 
 // Shape of GET /laboratories/{slug} — the full Prisma `Laboratory` record.
 // See apps/api/prisma/schema.prisma (model Laboratory). Everything under
@@ -44,6 +46,11 @@ export interface Laboratory {
   scopeUrl: string | null;
   scopeText: string | null;
   directions: string[];
+
+  // Supplementary detail supplied by the laboratory itself, once a member's
+  // claim has been approved. Null while nobody has filled it in. It is shown
+  // alongside the register's data, never in place of it.
+  profile: LaboratoryProfile | null;
 }
 
 type L10n = Record<Lang, string>;
@@ -70,6 +77,25 @@ const T = {
     en: "Accreditation sectors",
   },
   sectionDocuments: { ru: "Документы", uz: "Hujjatlar", en: "Documents" },
+  sectionProfile: {
+    ru: "Сведения от лаборатории",
+    uz: "Laboratoriya taqdim etgan ma'lumotlar",
+    en: "Provided by the laboratory",
+  },
+  profileNote: {
+    ru: "Эти сведения предоставила сама лаборатория. Они дополняют данные национального реестра, но не являются его частью.",
+    uz: "Bu ma'lumotlarni laboratoriyaning o'zi taqdim etgan. Ular milliy reyestr ma'lumotlarini to'ldiradi, lekin uning tarkibiga kirmaydi.",
+    en: "This detail was supplied by the laboratory itself. It adds to the national register's data and is not part of it.",
+  },
+  registerContactsNote: {
+    ru: "Контакты по данным национального реестра. Лаборатория указала свои — см. раздел «Сведения от лаборатории».",
+    uz: "Kontaktlar milliy reyestr ma'lumotlariga ko'ra. Laboratoriya o'z kontaktlarini ko'rsatgan — «Laboratoriya taqdim etgan ma'lumotlar» bo'limiga qarang.",
+    en: "Contacts as recorded in the national register. The laboratory has given its own — see “Provided by the laboratory”.",
+  },
+  profileServices: { ru: "Услуги", uz: "Xizmatlar", en: "Services" },
+  profileSpecialisations: { ru: "Специализации", uz: "Ixtisosliklar", en: "Specialisations" },
+  workingHours: { ru: "Часы работы", uz: "Ish vaqti", en: "Working hours" },
+  contactPerson: { ru: "Контактное лицо", uz: "Aloqa uchun shaxs", en: "Contact person" },
   sectionScope: {
     ru: "Область аккредитации",
     uz: "Akkreditatsiya sohasi",
@@ -301,7 +327,7 @@ function row(label: string, value: string | null | undefined): Row[] {
   return trimmed ? [[label, trimmed]] : [];
 }
 
-function Section({ title, rows }: { title: string; rows: Row[] }) {
+function Section({ title, rows, note }: { title: string; rows: Row[]; note?: string }) {
   if (rows.length === 0) return null;
   return (
     <section className="mt-10 pt-8" style={{ borderTop: "1px solid var(--uz-border)" }}>
@@ -311,6 +337,11 @@ function Section({ title, rows }: { title: string; rows: Row[] }) {
       >
         {title}
       </h2>
+      {note && (
+        <p className="mt-2 text-xs leading-relaxed" style={{ color: "var(--uz-text-faint)" }}>
+          {note}
+        </p>
+      )}
       <dl className="mt-4 grid grid-cols-1 gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
         {rows.map(([label, value]) => (
           <div key={label} className="min-w-0">
@@ -373,7 +404,7 @@ export function LaboratoryDetailView({ lab }: { lab: Laboratory }) {
           [
             t("email"),
             emailIsSingle ? (
-              <a href={`mailto:${lab.email.trim()}`} className="hover:underline">
+              <a key="email" href={`mailto:${lab.email.trim()}`} className="hover:underline">
                 {lab.email.trim()}
               </a>
             ) : (
@@ -387,6 +418,7 @@ export function LaboratoryDetailView({ lab }: { lab: Laboratory }) {
           [
             t("website"),
             <a
+              key="website"
               href={externalHref(lab.website.trim())}
               target="_blank"
               rel="noreferrer"
@@ -398,6 +430,65 @@ export function LaboratoryDetailView({ lab }: { lab: Laboratory }) {
         ] as Row[])
       : []),
   ];
+
+  // --- Member-supplied profile ---------------------------------------------
+  // Purely additive. Where the laboratory publishes a phone, e-mail or website
+  // of its own, the register's values stay visible in the section above — the
+  // official record is never silently replaced.
+  const profile = lab.profile;
+  const profileDescription = profile?.description?.trim() ?? "";
+  const profileServices = profile?.servicesText?.trim() ?? "";
+  const profileSpecialisations = (profile?.specialisations ?? [])
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const profileLogo = profile?.logoUrl?.trim() ?? "";
+  const profileEmail = profile?.publicEmail?.trim() ?? "";
+  const profileWebsite = profile?.publicWebsite?.trim() ?? "";
+
+  const profileRows: Row[] = [
+    ...row(t("contactPerson"), profile?.contactPerson),
+    ...row(t("phone"), profile?.publicPhone),
+    ...(profileEmail
+      ? ([
+          [
+            t("email"),
+            <a key="email" href={`mailto:${profileEmail}`} className="hover:underline">
+              {profileEmail}
+            </a>,
+          ],
+        ] as Row[])
+      : []),
+    ...(profileWebsite
+      ? ([
+          [
+            t("website"),
+            <a
+              key="website"
+              href={externalHref(profileWebsite)}
+              target="_blank"
+              rel="noreferrer"
+              className="hover:underline"
+            >
+              {profileWebsite}
+            </a>,
+          ],
+        ] as Row[])
+      : []),
+    ...row(t("workingHours"), profile?.workingHours),
+  ];
+
+  const hasProfile = Boolean(
+    profileDescription ||
+      profileServices ||
+      profileSpecialisations.length > 0 ||
+      profileRows.length > 0 ||
+      profileLogo,
+  );
+  // Only worth pointing at the member block from the register's contacts when
+  // the laboratory actually published contact details of its own.
+  const profileHasContacts = Boolean(
+    profile?.contactPerson?.trim() || profile?.publicPhone?.trim() || profileEmail || profileWebsite,
+  );
 
   const documents: Array<{ href: string; label: string }> = [
     ...(lab.certificateUrl ? [{ href: lab.certificateUrl, label: t("certificateDoc") }] : []),
@@ -475,7 +566,89 @@ export function LaboratoryDetailView({ lab }: { lab: Laboratory }) {
 
       <Section title={t("sectionAccreditation")} rows={accreditationRows} />
       <Section title={t("sectionOrganisation")} rows={organisationRows} />
-      <Section title={t("sectionContacts")} rows={contactRows} />
+      <Section
+        title={t("sectionContacts")}
+        rows={contactRows}
+        note={profileHasContacts && contactRows.length > 0 ? t("registerContactsNote") : undefined}
+      />
+
+      {hasProfile && (
+        <section className="mt-10 pt-8" style={{ borderTop: "1px solid var(--uz-border)" }}>
+          <h2
+            className="text-xs font-semibold uppercase tracking-wider"
+            style={{ fontFamily: "var(--uz-font-display)", color: "var(--uz-text-faint)" }}
+          >
+            {t("sectionProfile")}
+          </h2>
+          <p className="mt-2 text-xs leading-relaxed" style={{ color: "var(--uz-text-faint)" }}>
+            {t("profileNote")}
+          </p>
+
+          {profileLogo && (
+            /* eslint-disable-next-line @next/next/no-img-element -- member-supplied URL on an arbitrary host, next/image would need it whitelisted */
+            <img
+              src={externalHref(profileLogo)}
+              alt=""
+              className="mt-4 h-14 w-auto max-w-[200px] object-contain"
+            />
+          )}
+
+          {profileDescription && (
+            <p
+              className="mt-4 whitespace-pre-line leading-relaxed"
+              style={{ color: "var(--uz-text)" }}
+            >
+              {profileDescription}
+            </p>
+          )}
+
+          {profileServices && (
+            <div className="mt-5">
+              <h3 className="text-sm font-bold" style={{ color: "var(--uz-navy-900)" }}>
+                {t("profileServices")}
+              </h3>
+              <p
+                className="mt-1.5 whitespace-pre-line text-sm leading-relaxed"
+                style={{ color: "var(--uz-text)" }}
+              >
+                {profileServices}
+              </p>
+            </div>
+          )}
+
+          {profileSpecialisations.length > 0 && (
+            <div className="mt-5">
+              <h3 className="text-sm font-bold" style={{ color: "var(--uz-navy-900)" }}>
+                {t("profileSpecialisations")}
+              </h3>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {profileSpecialisations.map((s) => (
+                  <span
+                    key={s}
+                    className="rounded-full px-3 py-1 text-xs font-medium"
+                    style={{ border: "1px solid var(--uz-border-strong)", color: "var(--uz-text)" }}
+                  >
+                    {s}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {profileRows.length > 0 && (
+            <dl className="mt-5 grid grid-cols-1 gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
+              {profileRows.map(([label, value]) => (
+                <div key={label} className="min-w-0">
+                  <dt style={{ color: "var(--uz-text-faint)" }}>{label}</dt>
+                  <dd className="mt-0.5 break-words" style={{ color: "var(--uz-text)" }}>
+                    {value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          )}
+        </section>
+      )}
 
       {lab.directions.length > 0 && (
         <section className="mt-10 pt-8" style={{ borderTop: "1px solid var(--uz-border)" }}>
@@ -574,6 +747,8 @@ export function LaboratoryDetailView({ lab }: { lab: Laboratory }) {
           </details>
         </section>
       )}
+
+      <LaboratoryClaimForm laboratoryId={lab.id} lang={lang} />
     </div>
   );
 }

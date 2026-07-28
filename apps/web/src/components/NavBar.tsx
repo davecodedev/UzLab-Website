@@ -136,6 +136,18 @@ export function NavBar() {
             <span className="text-sm" style={{ color: "var(--uz-text-muted)" }}>
               {user.fullName}
             </span>
+            {/* Signed in, the account button leads to the member area rather than to /login. */}
+            <Link
+              href="/account"
+              className="flex flex-none items-center rounded-md px-[18px] text-sm font-semibold"
+              style={{
+                height: 38,
+                border: "1px solid var(--uz-border-strong)",
+                color: "var(--uz-navy-900)",
+              }}
+            >
+              {pick(NAV_DICT.account, lang)}
+            </Link>
             <button
               onClick={logout}
               className="rounded-md px-4 text-sm font-semibold text-white"
@@ -190,6 +202,16 @@ export function NavBar() {
                 <span className="text-sm" style={{ color: "var(--uz-text-muted)" }}>
                   {user.fullName}
                 </span>
+                <Link
+                  href="/account"
+                  className="w-fit rounded-md px-4 py-1.5 text-sm font-semibold"
+                  style={{
+                    border: "1px solid var(--uz-border-strong)",
+                    color: "var(--uz-navy-900)",
+                  }}
+                >
+                  {pick(NAV_DICT.account, lang)}
+                </Link>
                 <button
                   onClick={logout}
                   className="w-fit rounded-md px-4 py-1.5 text-sm font-semibold text-white"
