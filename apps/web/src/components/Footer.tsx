@@ -8,9 +8,9 @@ const FOOTER_DICT = {
   membership: { ru: "Членство", uz: "A'zolik", en: "Membership" },
   contact: { ru: "Контакты", uz: "Aloqa", en: "Contact" },
   address: {
-    ru: "Ташкент, ул. Мустакиллик, 45",
-    uz: "Toshkent, Mustaqillik ko'chasi, 45",
-    en: "Tashkent, Mustaqillik St. 45",
+    ru: "Ташкент, ул. Шифонур, 3/1",
+    uz: "Toshkent, Shifonur ko'chasi, 3/1",
+    en: "Tashkent, 3/1 Shifonur St.",
   },
 } as const;
 

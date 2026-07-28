@@ -10,7 +10,6 @@ const UI = {
 
   navMission: { ru: "Миссия", uz: "Missiya", en: "Mission" },
   navGoals: { ru: "Цели", uz: "Maqsadlar", en: "Goals" },
-  navLeadership: { ru: "Руководство", uz: "Rahbariyat", en: "Leadership" },
   navCharter: { ru: "Устав", uz: "Nizom", en: "Charter" },
 
   missionKicker: { ru: "МИССИЯ", uz: "MISSIYA", en: "MISSION" },
@@ -62,19 +61,6 @@ const UI = {
     en: "Taking part in key changes to the regulatory and technical framework: analytical papers, technical reports, methodological guides, seminars and technical working group meetings.",
   },
 
-  leadershipKicker: { ru: "РУКОВОДСТВО", uz: "RAHBARIYAT", en: "LEADERSHIP" },
-  role1: { ru: "Председатель", uz: "Rais", en: "Chairperson" },
-  role2: { ru: "Заместитель председателя", uz: "Rais o'rinbosari", en: "Deputy chairperson" },
-  role3: { ru: "Исполнительный директор", uz: "Ijrochi direktor", en: "Executive director" },
-  role4: { ru: "Председатель техкомитета", uz: "Texnik qo'mita raisi", en: "Technical committee chair" },
-  photoPlaceholder: { ru: "ФОТО", uz: "SURAT", en: "PHOTO" },
-  nameTbc: { ru: "ФИО уточняется", uz: "F.I.Sh. aniqlanmoqda", en: "Name to be confirmed" },
-  leadershipNote: {
-    ru: "Фотографии и имена руководства — по материалам ассоциации; в макете стоят заглушки.",
-    uz: "Rahbariyat suratlari va ismlari assotsiatsiya materiallari asosida; maketda vaqtinchalik o'rin egallovchilar ko'rsatilgan.",
-    en: "Leadership photos and names come from association materials; placeholders are shown in this layout.",
-  },
-
   charterKicker: { ru: "УСТАВ И ДОКУМЕНТЫ", uz: "NIZOM VA HUJJATLAR", en: "CHARTER AND DOCUMENTS" },
   doc1Title: {
     ru: "Устав Ассоциации лабораторий Узбекистана (2025)",
@@ -114,7 +100,6 @@ export function AboutView() {
   const navLinks = [
     { href: "#mission", label: t("navMission") },
     { href: "#goals", label: t("navGoals") },
-    { href: "#leadership", label: t("navLeadership") },
     { href: "#charter", label: t("navCharter") },
   ];
 
@@ -130,8 +115,6 @@ export function AboutView() {
     { number: "02", title: t("goal2Title"), body: t("goal2Body") },
     { number: "03", title: t("goal3Title"), body: t("goal3Body") },
   ];
-
-  const leadership = [t("role1"), t("role2"), t("role3"), t("role4")];
 
   const documents = [
     { code: "УзЛаб-У-2025", title: t("doc1Title"), lang: "RU · UZ", size: t("doc1Size") },
@@ -238,44 +221,6 @@ export function AboutView() {
             </div>
           ))}
         </div>
-      </div>
-
-      {/* LEADERSHIP */}
-      <div id="leadership" className="mx-auto max-w-[1240px] px-8 py-12 scroll-mt-20">
-        <Kicker>{t("leadershipKicker")}</Kicker>
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {leadership.map((role) => (
-            <div
-              key={role}
-              className="rounded-xl bg-white p-6 text-center"
-              style={{ border: "1px solid var(--uz-border)" }}
-            >
-              <div
-                className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full"
-                style={{
-                  background: "var(--uz-blue-50)",
-                  border: "1px dashed var(--uz-border-strong)",
-                }}
-              >
-                <span
-                  className="text-[10px] font-medium tracking-[1px]"
-                  style={{ fontFamily: "var(--uz-font-mono)", color: "var(--uz-text-faint)" }}
-                >
-                  {t("photoPlaceholder")}
-                </span>
-              </div>
-              <h3 className="text-[15px] font-bold" style={{ color: "var(--uz-navy-900)" }}>
-                {role}
-              </h3>
-              <p className="mt-1 text-[13px]" style={{ color: "var(--uz-text-muted)" }}>
-                {t("nameTbc")}
-              </p>
-            </div>
-          ))}
-        </div>
-        <p className="mt-5 text-[13px]" style={{ color: "var(--uz-text-faint)" }}>
-          {t("leadershipNote")}
-        </p>
       </div>
 
       {/* CHARTER */}

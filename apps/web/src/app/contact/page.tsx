@@ -19,15 +19,15 @@ const T = {
     uz: "O'zbekiston laboratoriyalari assotsiatsiyasi",
     en: "Association of Laboratories of Uzbekistan",
   },
-  mapPlaceholder: {
-    ru: "КАРТА · Яндекс/Google Maps embed",
-    uz: "XARITA · Yandex/Google Maps embed",
-    en: "MAP · Yandex/Google Maps embed",
+  mapTitle: {
+    ru: "Карта проезда — Шифонур, 3/1",
+    uz: "Yo'l xaritasi — Shifonur, 3/1",
+    en: "Location map — 3/1 Shifonur St.",
   },
-  metroNote: {
-    ru: "Станция метро «Мустакиллик майдони», 5 минут пешком",
-    uz: "«Mustaqillik maydoni» metro bekati, piyoda 5 daqiqa",
-    en: "Mustaqillik Maydoni metro station, a 5-minute walk",
+  mapNote: {
+    ru: "Ташкент, ул. Шифонур, 3/1",
+    uz: "Toshkent, Shifonur ko'chasi, 3/1",
+    en: "Tashkent, 3/1 Shifonur St.",
   },
   openMap: { ru: "Открыть карту →", uz: "Xaritani ochish →", en: "Open map →" },
 
@@ -60,18 +60,24 @@ const T = {
   },
 };
 
+// Office location: Tashkent, 3/1 Shifonur St. (41.352603, 69.219533).
+// `pt` drops the pin; `ll` centres the view on the same point.
+const MAP_EMBED_SRC =
+  "https://yandex.com/map-widget/v1/?ll=69.219533%2C41.352603&z=17&pt=69.219533,41.352603,pm2blm";
+const MAP_LINK = "https://yandex.com/maps/?ll=69.219533%2C41.352603&z=17&pt=69.219533,41.352603";
+
 const CONTACT_FIELDS: { label: L10n; value: L10n }[] = [
   {
     label: { ru: "АДРЕС", uz: "MANZIL", en: "ADDRESS" },
     value: {
-      ru: "Ташкент, ул. Мустакиллик, 45, офис 301",
-      uz: "Toshkent, Mustaqillik ko'chasi, 45, 301-ofis",
-      en: "Tashkent, 45 Mustaqillik St., office 301",
+      ru: "Ташкент, ул. Шифонур, 3/1",
+      uz: "Toshkent, Shifonur ko'chasi, 3/1",
+      en: "Tashkent, 3/1 Shifonur St.",
     },
   },
   {
     label: { ru: "ТЕЛЕФОН", uz: "TELEFON", en: "PHONE" },
-    value: { ru: "+998 71 200-45-67", uz: "+998 71 200-45-67", en: "+998 71 200-45-67" },
+    value: { ru: "+998 90 185 82 89", uz: "+998 90 185 82 89", en: "+998 90 185 82 89" },
   },
   {
     label: { ru: "E-MAIL", uz: "E-MAIL", en: "E-MAIL" },
@@ -199,24 +205,27 @@ export default function ContactPage() {
               className="overflow-hidden rounded-xl"
               style={{ border: "1px solid var(--uz-border)" }}
             >
-              <div
-                className="flex aspect-video items-center justify-center border-b border-dashed text-center"
-                style={{ background: "var(--uz-blue-50)", borderColor: "var(--uz-border-strong)" }}
-              >
-                <span
-                  className="px-4 text-[12px] font-medium tracking-[0.5px]"
-                  style={{ fontFamily: "var(--uz-font-mono)", color: "var(--uz-text-faint)" }}
-                >
-                  {t("mapPlaceholder")}
-                </span>
-              </div>
+              <iframe
+                src={MAP_EMBED_SRC}
+                title={t("mapTitle")}
+                loading="lazy"
+                allowFullScreen
+                className="aspect-video w-full border-0"
+                style={{ borderBottom: "1px solid var(--uz-border)" }}
+              />
               <div className="flex items-center justify-between gap-3 px-4 py-3">
                 <span className="text-[13.5px]" style={{ color: "var(--uz-text-muted)" }}>
-                  {t("metroNote")}
+                  {t("mapNote")}
                 </span>
-                <span className="shrink-0 text-[13.5px] font-semibold" style={{ color: "var(--uz-blue-600)" }}>
+                <a
+                  href={MAP_LINK}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="shrink-0 text-[13.5px] font-semibold hover:underline"
+                  style={{ color: "var(--uz-blue-600)" }}
+                >
                   {t("openMap")}
-                </span>
+                </a>
               </div>
             </div>
           </div>
