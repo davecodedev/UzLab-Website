@@ -24,7 +24,6 @@ const T = {
     en: "The Association of Laboratories of Uzbekistan unites testing, calibration and research labs: standards, training, international cooperation.",
   },
   joinCta: { ru: "Подать заявку", uz: "Ariza topshirish", en: "Apply now" },
-  browsePub: { ru: "Публикации", uz: "Nashrlar", en: "Publications" },
   p1t: { ru: "Вступить в ассоциацию", uz: "Assotsiatsiyaga a'zo bo'lish", en: "Join the association" },
   p1s: {
     ru: "Типы членства, взносы и онлайн-заявка для лабораторий и специалистов.",
@@ -32,13 +31,6 @@ const T = {
     en: "Membership types, fees and an online application for labs and specialists.",
   },
   p1a: { ru: "Членство", uz: "A'zolik", en: "Membership" },
-  p2t: { ru: "Найти документ", uz: "Hujjat topish", en: "Find a document" },
-  p2s: {
-    ru: "Сборники методик, нормативные акты и международная литература в одной библиотеке.",
-    uz: "Metodikalar to'plamlari, normativ hujjatlar va xalqaro adabiyot — bitta kutubxonada.",
-    en: "Method collections, regulatory acts and international literature in one library.",
-  },
-  p2a: { ru: "Публикации", uz: "Nashrlar", en: "Publications" },
   p3t: { ru: "Повысить квалификацию", uz: "Malaka oshirish", en: "Upskill your team" },
   p3s: {
     ru: "Курсы, семинары и практикумы — очно в Ташкенте и онлайн.",
@@ -95,10 +87,6 @@ const T = {
 
 const CARD_ICONS: React.ReactNode[] = [
   <path key="p1" d="M14 3L24 8V14C24 19.5 19.8 23.6 14 25C8.2 23.6 4 19.5 4 14V8L14 3Z M10 14L13 17L18.5 11" />,
-  <path
-    key="p2"
-    d="M5 24V6C5 4.9 5.9 4 7 4H19L23 8V24 M9 12H19M9 16H19M9 20H15"
-  />,
   <path key="p3" d="M4 22C4 18 8 16 14 16C20 16 24 18 24 22V24H4V22Z M14 9m-5 0a5 5 0 1 0 10 0a5 5 0 1 0 -10 0" />,
   <path key="p4" d="M4 9H24V24H4V9ZM10 9V6C10 4.9 10.9 4 12 4H16C17.1 4 18 4.9 18 6V9M4 15H24" />,
 ];
@@ -109,7 +97,6 @@ export function HomeView({ news }: { news: NewsArticle[] }) {
 
   const cards = [
     { href: "/membership", title: t("p1t"), sub: t("p1s"), action: t("p1a") },
-    { href: "/publications", title: t("p2t"), sub: t("p2s"), action: t("p2a") },
     { href: "/professional-development", title: t("p3t"), sub: t("p3s"), action: t("p3a") },
     { href: "/career", title: t("p4t"), sub: t("p4s"), action: t("p4a") },
   ];
@@ -151,20 +138,13 @@ export function HomeView({ news }: { news: NewsArticle[] }) {
             >
               {t("joinCta")}
             </Link>
-            <Link
-              href="/publications"
-              className="rounded-md border px-7 text-base font-semibold text-white"
-              style={{ height: 52, lineHeight: "50px", borderColor: "rgba(255,255,255,0.3)" }}
-            >
-              {t("browsePub")}
-            </Link>
           </div>
         </div>
       </div>
 
       {/* INTENT PATHS */}
       <div className="relative mx-auto -mt-9 max-w-[1240px] px-8">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {cards.map((c, i) => (
             <Link
               key={c.href}

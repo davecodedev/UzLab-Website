@@ -1,13 +1,5 @@
-const CATEGORIES = [
-  { value: "", label: "Any category" },
-  { value: "COOKBOOK", label: "Cookbook" },
-  { value: "LEGISLATIVE", label: "Legislative" },
-  { value: "INTERNATIONAL_LITERATURE", label: "International literature" },
-];
-
 const TYPES = [
   { value: "", label: "Everything" },
-  { value: "publication", label: "Publications" },
   { value: "news", label: "News" },
   { value: "member", label: "Members" },
   { value: "laboratory", label: "Laboratories" },
@@ -29,7 +21,6 @@ const LAB_FIELDS = [
 export interface SearchFiltersValue {
   q?: string;
   type?: string;
-  category?: string;
   language?: string;
   author?: string;
   tags?: string;
@@ -92,23 +83,6 @@ export function SearchFiltersForm({
             </select>
           </div>
         )}
-        <div>
-          <label className={labelClass} style={labelStyle}>
-            Category
-          </label>
-          <select
-            name="category"
-            defaultValue={values.category ?? ""}
-            className={`mt-1 ${inputClass}`}
-            style={inputStyle}
-          >
-            {CATEGORIES.map((c) => (
-              <option key={c.value} value={c.value}>
-                {c.label}
-              </option>
-            ))}
-          </select>
-        </div>
         <div>
           <label className={labelClass} style={labelStyle}>
             Language

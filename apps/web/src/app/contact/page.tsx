@@ -3,32 +3,126 @@
 import Link from "next/link";
 import { useState } from "react";
 import { api, ApiError } from "@/lib/api";
+import { useLang, pick, type Lang } from "@/lib/i18n";
 
-const CONTACT_FIELDS = [
-  { label: "АДРЕС", value: "Ташкент, ул. Мустакиллик, 45, офис 301" },
-  { label: "ТЕЛЕФОН", value: "+998 71 200-45-67" },
-  { label: "E-MAIL", value: "info@uzlab.org" },
-  { label: "ПРИЁМНЫЕ ЧАСЫ", value: "Пн–Пт, 9:00–18:00 (перерыв 13:00–14:00)" },
+type L10n = Record<Lang, string>;
+
+const T = {
+  breadcrumbHome: { ru: "Главная", uz: "Bosh sahifa", en: "Home" },
+  pageTitle: {
+    ru: "Контакты и обратная связь",
+    uz: "Kontaktlar va qayta aloqa",
+    en: "Contacts and feedback",
+  },
+  orgName: {
+    ru: "Ассоциация лабораторий Узбекистана",
+    uz: "O'zbekiston laboratoriyalari assotsiatsiyasi",
+    en: "Association of Laboratories of Uzbekistan",
+  },
+  mapPlaceholder: {
+    ru: "КАРТА · Яндекс/Google Maps embed",
+    uz: "XARITA · Yandex/Google Maps embed",
+    en: "MAP · Yandex/Google Maps embed",
+  },
+  metroNote: {
+    ru: "Станция метро «Мустакиллик майдони», 5 минут пешком",
+    uz: "«Mustaqillik maydoni» metro bekati, piyoda 5 daqiqa",
+    en: "Mustaqillik Maydoni metro station, a 5-minute walk",
+  },
+  openMap: { ru: "Открыть карту →", uz: "Xaritani ochish →", en: "Open map →" },
+
+  tabContact: { ru: "Написать нам", uz: "Bizga yozing", en: "Write to us" },
+  tabFeedback: {
+    ru: "Отзывы и предложения",
+    uz: "Fikr va takliflar",
+    en: "Feedback and suggestions",
+  },
+
+  thanks: {
+    ru: "Спасибо — мы свяжемся с вами.",
+    uz: "Rahmat — biz siz bilan bog'lanamiz.",
+    en: "Thank you — we will get back to you.",
+  },
+  labelName: { ru: "Имя", uz: "Ism", en: "Name" },
+  labelEmail: { ru: "Email", uz: "Email", en: "Email" },
+  labelSubject: { ru: "Тема", uz: "Mavzu", en: "Subject" },
+  labelMessage: { ru: "Сообщение", uz: "Xabar", en: "Message" },
+  submit: { ru: "Отправить", uz: "Yuborish", en: "Send" },
+  consent: {
+    ru: "Согласен(на) на обработку персональных данных",
+    uz: "Shaxsiy ma'lumotlarni qayta ishlashga roziman",
+    en: "I consent to the processing of my personal data",
+  },
+  submitFailed: {
+    ru: "Не удалось отправить сообщение.",
+    uz: "Xabarni yuborib bo'lmadi.",
+    en: "Submission failed.",
+  },
+};
+
+const CONTACT_FIELDS: { label: L10n; value: L10n }[] = [
+  {
+    label: { ru: "АДРЕС", uz: "MANZIL", en: "ADDRESS" },
+    value: {
+      ru: "Ташкент, ул. Мустакиллик, 45, офис 301",
+      uz: "Toshkent, Mustaqillik ko'chasi, 45, 301-ofis",
+      en: "Tashkent, 45 Mustaqillik St., office 301",
+    },
+  },
+  {
+    label: { ru: "ТЕЛЕФОН", uz: "TELEFON", en: "PHONE" },
+    value: { ru: "+998 71 200-45-67", uz: "+998 71 200-45-67", en: "+998 71 200-45-67" },
+  },
+  {
+    label: { ru: "E-MAIL", uz: "E-MAIL", en: "E-MAIL" },
+    value: { ru: "info@uzlab.org", uz: "info@uzlab.org", en: "info@uzlab.org" },
+  },
+  {
+    label: { ru: "ПРИЁМНЫЕ ЧАСЫ", uz: "QABUL SOATLARI", en: "OFFICE HOURS" },
+    value: {
+      ru: "Пн–Пт, 9:00–18:00 (перерыв 13:00–14:00)",
+      uz: "Du–Ju, 9:00–18:00 (tanaffus 13:00–14:00)",
+      en: "Mon–Fri, 9:00–18:00 (break 13:00–14:00)",
+    },
+  },
 ];
 
-const SUBJECTS = [
-  "Вопрос о членстве",
-  "Обучение и семинары",
-  "Публикации и методики",
-  "Техническая поддержка сайта",
-  "Другое",
+// `id` is the stable value kept in state so switching language does not reset
+// the select; the RU label is what gets sent to staff, keeping inbox entries
+// consistent regardless of the visitor's interface language.
+const SUBJECTS: { id: string; label: L10n }[] = [
+  {
+    id: "membership",
+    label: { ru: "Вопрос о членстве", uz: "A'zolik bo'yicha savol", en: "Membership question" },
+  },
+  {
+    id: "training",
+    label: { ru: "Обучение и семинары", uz: "O'qitish va seminarlar", en: "Training and seminars" },
+  },
+  {
+    id: "support",
+    label: {
+      ru: "Техническая поддержка сайта",
+      uz: "Sayt bo'yicha texnik yordam",
+      en: "Website technical support",
+    },
+  },
+  { id: "other", label: { ru: "Другое", uz: "Boshqa", en: "Other" } },
 ];
 
-const TABS: { value: "CONTACT" | "FEEDBACK"; label: string }[] = [
-  { value: "CONTACT", label: "Написать нам" },
-  { value: "FEEDBACK", label: "Отзывы и предложения" },
+const TABS: { value: "CONTACT" | "FEEDBACK"; labelKey: "tabContact" | "tabFeedback" }[] = [
+  { value: "CONTACT", labelKey: "tabContact" },
+  { value: "FEEDBACK", labelKey: "tabFeedback" },
 ];
 
 export default function ContactPage() {
+  const { lang } = useLang();
+  const t = <K extends keyof typeof T>(key: K) => pick(T[key], lang);
+
   const [type, setType] = useState<"CONTACT" | "FEEDBACK">("CONTACT");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [subject, setSubject] = useState(SUBJECTS[0]);
+  const [subjectId, setSubjectId] = useState(SUBJECTS[0].id);
   const [message, setMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
@@ -39,10 +133,11 @@ export default function ContactPage() {
     try {
       // No dedicated "subject" field on the backend — folded into the message
       // body rather than silently dropped, so staff still see it.
+      const subject = SUBJECTS.find((s) => s.id === subjectId)?.label.ru ?? subjectId;
       await api.post("/contact", { type, name, email, message: `Тема: ${subject}\n\n${message}` });
       setSubmitted(true);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Submission failed.");
+      setError(err instanceof ApiError ? err.message : t("submitFailed"));
     }
   }
 
@@ -52,10 +147,10 @@ export default function ContactPage() {
       <div className="mx-auto max-w-[1240px] px-8 pt-8">
         <nav className="text-sm" style={{ color: "var(--uz-text-muted)" }}>
           <Link href="/" className="hover:underline">
-            Главная
+            {t("breadcrumbHome")}
           </Link>
           <span className="mx-2">/</span>
-          <span style={{ color: "var(--uz-text)" }}>Контакты и обратная связь</span>
+          <span style={{ color: "var(--uz-text)" }}>{t("pageTitle")}</span>
         </nav>
       </div>
 
@@ -65,7 +160,7 @@ export default function ContactPage() {
           className="text-[34px] font-extrabold leading-tight"
           style={{ fontFamily: "var(--uz-font-display)", color: "var(--uz-navy-900)" }}
         >
-          Контакты и обратная связь
+          {t("pageTitle")}
         </h1>
       </div>
 
@@ -82,20 +177,18 @@ export default function ContactPage() {
                 className="uz-slash absolute -right-4 top-6 inline-block h-16 w-6"
                 style={{ background: "var(--uz-blue-600)", opacity: 0.5 }}
               />
-              <h3 className="relative text-lg font-bold text-white">
-                Ассоциация лабораторий Узбекистана
-              </h3>
+              <h3 className="relative text-lg font-bold text-white">{t("orgName")}</h3>
               <div className="relative mt-6 space-y-5">
                 {CONTACT_FIELDS.map((f) => (
-                  <div key={f.label}>
+                  <div key={f.label.en}>
                     <div
                       className="text-[11.5px] font-semibold tracking-[1px]"
                       style={{ color: "#8494AC" }}
                     >
-                      {f.label}
+                      {pick(f.label, lang)}
                     </div>
                     <div className="mt-1 text-[14.5px]" style={{ color: "#C7D3E6" }}>
-                      {f.value}
+                      {pick(f.value, lang)}
                     </div>
                   </div>
                 ))}
@@ -114,15 +207,15 @@ export default function ContactPage() {
                   className="px-4 text-[12px] font-medium tracking-[0.5px]"
                   style={{ fontFamily: "var(--uz-font-mono)", color: "var(--uz-text-faint)" }}
                 >
-                  КАРТА · Яндекс/Google Maps embed
+                  {t("mapPlaceholder")}
                 </span>
               </div>
               <div className="flex items-center justify-between gap-3 px-4 py-3">
                 <span className="text-[13.5px]" style={{ color: "var(--uz-text-muted)" }}>
-                  Станция метро «Мустакиллик майдони», 5 минут пешком
+                  {t("metroNote")}
                 </span>
                 <span className="shrink-0 text-[13.5px] font-semibold" style={{ color: "var(--uz-blue-600)" }}>
-                  Открыть карту →
+                  {t("openMap")}
                 </span>
               </div>
             </div>
@@ -154,7 +247,7 @@ export default function ContactPage() {
                         : { background: "transparent", color: "var(--uz-text-muted)" }
                     }
                   >
-                    {tab.label}
+                    {t(tab.labelKey)}
                   </button>
                 );
               })}
@@ -162,12 +255,12 @@ export default function ContactPage() {
 
             <div className="p-6 sm:p-8">
               {submitted ? (
-                <p style={{ color: "var(--uz-text-muted)" }}>Спасибо — мы свяжемся с вами.</p>
+                <p style={{ color: "var(--uz-text-muted)" }}>{t("thanks")}</p>
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-5">
                   <div>
                     <label className="block text-sm font-bold" style={{ color: "var(--uz-ink)" }}>
-                      Имя
+                      {t("labelName")}
                     </label>
                     <input
                       value={name}
@@ -179,7 +272,7 @@ export default function ContactPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-bold" style={{ color: "var(--uz-ink)" }}>
-                      Email
+                      {t("labelEmail")}
                     </label>
                     <input
                       type="email"
@@ -193,17 +286,17 @@ export default function ContactPage() {
                   {type === "CONTACT" && (
                     <div>
                       <label className="block text-sm font-bold" style={{ color: "var(--uz-ink)" }}>
-                        Тема
+                        {t("labelSubject")}
                       </label>
                       <select
-                        value={subject}
-                        onChange={(e) => setSubject(e.target.value)}
+                        value={subjectId}
+                        onChange={(e) => setSubjectId(e.target.value)}
                         className="mt-1.5 h-11 w-full rounded-md px-3.5 text-sm outline-none"
                         style={{ border: "1px solid var(--uz-border-strong)" }}
                       >
                         {SUBJECTS.map((s) => (
-                          <option key={s} value={s}>
-                            {s}
+                          <option key={s.id} value={s.id}>
+                            {pick(s.label, lang)}
                           </option>
                         ))}
                       </select>
@@ -211,7 +304,7 @@ export default function ContactPage() {
                   )}
                   <div>
                     <label className="block text-sm font-bold" style={{ color: "var(--uz-ink)" }}>
-                      Сообщение
+                      {t("labelMessage")}
                     </label>
                     <textarea
                       value={message}
@@ -235,14 +328,14 @@ export default function ContactPage() {
                       className="h-11 rounded-md px-6 text-sm font-semibold text-white"
                       style={{ background: "var(--uz-blue-600)" }}
                     >
-                      Отправить
+                      {t("submit")}
                     </button>
                     <label
                       className="flex items-center gap-2 text-[13px]"
                       style={{ color: "var(--uz-text-muted)" }}
                     >
                       <input type="checkbox" className="h-4 w-4" />
-                      Согласен(на) на обработку персональных данных
+                      {t("consent")}
                     </label>
                   </div>
                 </form>

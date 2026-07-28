@@ -3,7 +3,7 @@ import { SearchFiltersForm } from "@/components/SearchFiltersForm";
 import { api } from "@/lib/api";
 
 interface SearchResultItem {
-  type: "publication" | "news" | "member" | "laboratory";
+  type: "news" | "member" | "laboratory";
   id: string;
   title: string;
   summary: string;
@@ -19,7 +19,6 @@ interface SearchResultItem {
 type SearchParams = {
   q?: string;
   type?: string;
-  category?: string;
   language?: string;
   author?: string;
   tags?: string;
@@ -61,7 +60,7 @@ export default async function SearchPage({
         Поиск
       </h1>
       <p className="mt-2 text-sm" style={{ color: "var(--uz-text-muted)" }}>
-        Публикации, новости, члены ассоциации и лаборатории — в одном поиске.
+        Новости, члены ассоциации и лаборатории — в одном поиске.
       </p>
 
       <div className="mt-6">

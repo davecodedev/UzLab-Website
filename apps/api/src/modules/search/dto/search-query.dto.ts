@@ -6,17 +6,16 @@ import {
   IsString,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { PublicationCategory, LaboratoryField } from '@prisma/client';
+import { LaboratoryField } from '@prisma/client';
 
 export enum SearchResultType {
-  PUBLICATION = 'publication',
   NEWS = 'news',
   MEMBER = 'member',
   LABORATORY = 'laboratory',
 }
 
-// Category/language/author/tags only apply to Publications; region/labField
-// only apply to Laboratories. One filter named in the original spec —
+// region/labField only apply to Laboratories. One filter named in the
+// original spec —
 // Membership Type — is deliberately not implemented here: it describes a
 // Member, not a searchable content item. Add new optional fields here (never
 // rename/remove existing ones) when new modules need their own facets — see
@@ -29,10 +28,6 @@ export class SearchQueryDto {
   @IsOptional()
   @IsEnum(SearchResultType)
   type?: SearchResultType;
-
-  @IsOptional()
-  @IsEnum(PublicationCategory)
-  category?: PublicationCategory;
 
   @IsOptional()
   @IsString()

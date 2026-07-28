@@ -4,11 +4,44 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
 import { getAccessToken } from "@/lib/auth-client";
+import { useLang, pick } from "@/lib/i18n";
 
 interface MembershipType {
   id: string;
   name: string;
 }
+
+const UI = {
+  kicker: { ru: "ЧЛЕНСТВО", uz: "A'ZOLIK", en: "MEMBERSHIP" },
+  title: { ru: "Заявка на членство", uz: "A'zolikka ariza", en: "Membership application" },
+  intro: {
+    ru: "Заполните форму — мы рассмотрим заявку и свяжемся с вами.",
+    uz: "Shaklni to'ldiring — arizani ko'rib chiqamiz va siz bilan bog'lanamiz.",
+    en: "Fill in the form — we will review your application and get in touch.",
+  },
+  labelType: { ru: "Тип членства", uz: "A'zolik turi", en: "Membership type" },
+  labelPhone: { ru: "Телефон", uz: "Telefon", en: "Phone" },
+  labelOrganization: { ru: "Организация", uz: "Tashkilot", en: "Organisation" },
+  labelNotes: { ru: "Комментарий", uz: "Izoh", en: "Comment" },
+  optional: { ru: "(необязательно)", uz: "(ixtiyoriy)", en: "(optional)" },
+  submit: { ru: "Отправить заявку", uz: "Arizani yuborish", en: "Submit application" },
+  loadTypesError: {
+    ru: "Не удалось загрузить типы членства.",
+    uz: "A'zolik turlarini yuklab bo'lmadi.",
+    en: "Could not load membership types.",
+  },
+  submitError: {
+    ru: "Не удалось отправить заявку.",
+    uz: "Arizani yuborib bo'lmadi.",
+    en: "Could not submit the application.",
+  },
+  successTitle: { ru: "Заявка отправлена", uz: "Ariza yuborildi", en: "Application submitted" },
+  successBody: {
+    ru: "Мы рассмотрим вашу заявку и свяжемся с вами по электронной почте.",
+    uz: "Arizangizni ko'rib chiqamiz va siz bilan elektron pochta orqali bog'lanamiz.",
+    en: "We will review your application and contact you by email.",
+  },
+};
 
 const inputClass =
   "mt-1.5 h-11 w-full rounded-md px-3.5 text-sm outline-none transition-colors focus:border-[var(--uz-blue-500)]";
@@ -17,12 +50,15 @@ const labelClass = "block text-sm font-bold";
 
 export default function ApplyPage() {
   const router = useRouter();
+  const { lang } = useLang();
+  const t = <K extends keyof typeof UI>(key: K) => pick(UI[key], lang);
+
   const [types, setTypes] = useState<MembershipType[]>([]);
   const [membershipTypeId, setMembershipTypeId] = useState("");
   const [phone, setPhone] = useState("");
   const [organization, setOrganization] = useState("");
   const [notes, setNotes] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<keyof typeof UI | string | null>(null);
   const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
@@ -36,7 +72,7 @@ export default function ApplyPage() {
         setTypes(result);
         if (result.length > 0) setMembershipTypeId(result[0].id);
       })
-      .catch(() => setError("Не удалось загрузить типы членства."));
+      .catch(() => setError("loadTypesError"));
   }, [router]);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -55,9 +91,13 @@ export default function ApplyPage() {
       );
       setSubmitted(true);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Не удалось отправить заявку.");
+      setError(err instanceof ApiError ? err.message : "submitError");
     }
   }
+
+  // Dictionary keys are stored raw so the message re-translates on language change;
+  // API error messages pass through verbatim.
+  const errorText = error === null ? null : error in UI ? t(error as keyof typeof UI) : error;
 
   if (submitted) {
     return (
@@ -84,10 +124,10 @@ export default function ApplyPage() {
             className="mt-5 text-2xl font-extrabold"
             style={{ fontFamily: "var(--uz-font-display)", color: "var(--uz-navy-900)" }}
           >
-            Заявка отправлена
+            {t("successTitle")}
           </h1>
           <p className="mt-3 text-sm leading-relaxed" style={{ color: "var(--uz-text-muted)" }}>
-            Мы рассмотрим вашу заявку и свяжемся с вами по электронной почте.
+            {t("successBody")}
           </p>
         </div>
       </div>
@@ -99,17 +139,17 @@ export default function ApplyPage() {
       <div className="mb-8 flex items-center gap-2.5">
         <span className="uz-slash inline-block h-5 w-2" style={{ background: "var(--uz-blue-600)" }} />
         <span className="text-[13px] font-bold tracking-[1.5px]" style={{ color: "var(--uz-navy-800)" }}>
-          ЧЛЕНСТВО
+          {t("kicker")}
         </span>
       </div>
       <h1
         className="text-[34px] font-extrabold leading-tight"
         style={{ fontFamily: "var(--uz-font-display)", color: "var(--uz-navy-900)" }}
       >
-        Заявка на членство
+        {t("title")}
       </h1>
       <p className="mt-3 text-base leading-relaxed" style={{ color: "var(--uz-text-muted)" }}>
-        Заполните форму — мы рассмотрим заявку и свяжемся с вами.
+        {t("intro")}
       </p>
 
       <form
@@ -119,7 +159,7 @@ export default function ApplyPage() {
       >
         <div>
           <label className={labelClass} style={{ color: "var(--uz-ink)" }}>
-            Тип членства
+            {t("labelType")}
           </label>
           <select
             value={membershipTypeId}
@@ -137,7 +177,7 @@ export default function ApplyPage() {
         </div>
         <div>
           <label className={labelClass} style={{ color: "var(--uz-ink)" }}>
-            Телефон
+            {t("labelPhone")}
           </label>
           <input
             value={phone}
@@ -149,7 +189,10 @@ export default function ApplyPage() {
         </div>
         <div>
           <label className={labelClass} style={{ color: "var(--uz-ink)" }}>
-            Организация <span className="font-normal" style={{ color: "var(--uz-text-faint)" }}>(необязательно)</span>
+            {t("labelOrganization")}{" "}
+            <span className="font-normal" style={{ color: "var(--uz-text-faint)" }}>
+              {t("optional")}
+            </span>
           </label>
           <input
             value={organization}
@@ -160,7 +203,10 @@ export default function ApplyPage() {
         </div>
         <div>
           <label className={labelClass} style={{ color: "var(--uz-ink)" }}>
-            Комментарий <span className="font-normal" style={{ color: "var(--uz-text-faint)" }}>(необязательно)</span>
+            {t("labelNotes")}{" "}
+            <span className="font-normal" style={{ color: "var(--uz-text-faint)" }}>
+              {t("optional")}
+            </span>
           </label>
           <textarea
             value={notes}
@@ -170,9 +216,9 @@ export default function ApplyPage() {
             style={inputStyle}
           />
         </div>
-        {error && (
+        {errorText && (
           <p className="text-sm font-medium" style={{ color: "var(--uz-error)" }}>
-            {error}
+            {errorText}
           </p>
         )}
         <button
@@ -180,7 +226,7 @@ export default function ApplyPage() {
           className="h-[46px] w-full rounded-md text-sm font-semibold text-white transition-colors"
           style={{ background: "var(--uz-blue-600)" }}
         >
-          Отправить заявку
+          {t("submit")}
         </button>
       </form>
     </div>

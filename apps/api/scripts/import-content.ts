@@ -1,6 +1,6 @@
 // One-off bulk content importer — reads the UzLab_Content_Template.xlsx
-// format (see content-templates/) and creates Publications, News, and
-// MembershipTypes directly via Prisma.
+// format (see content-templates/) and creates News and MembershipTypes
+// directly via Prisma.
 //
 // Usage: npm run import:content --workspace=apps/api -- /path/to/file.xlsx
 //
@@ -13,7 +13,7 @@ import 'dotenv/config';
 import { readFileSync } from 'node:fs';
 import * as XLSX from 'xlsx';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient, PublicationCategory } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { slugify } from '../src/common/utils/slugify';
 
 function parseDate(value: unknown): Date | undefined {
@@ -23,14 +23,6 @@ function parseDate(value: unknown): Date | undefined {
   const d = new Date(s);
   if (Number.isNaN(d.getTime())) throw new Error(`Invalid date: "${s}"`);
   return d;
-}
-
-function parseTags(value: unknown): string[] {
-  if (!value) return [];
-  return String(value)
-    .split(',')
-    .map((t) => t.trim())
-    .filter(Boolean);
 }
 
 function requireString(value: unknown, field: string, row: number): string {
@@ -49,38 +41,11 @@ async function main() {
   const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
   const prisma = new PrismaClient({ adapter });
 
-  const publicationsSheet = workbook.Sheets['Publications'];
   const newsSheet = workbook.Sheets['News'];
   const membershipSheet = workbook.Sheets['Membership Types'];
 
-  let publicationsCreated = 0;
   let newsCreated = 0;
   let membershipTypesCreated = 0;
-
-  if (publicationsSheet) {
-    const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(publicationsSheet);
-    for (const [i, row] of rows.entries()) {
-      const excelRow = i + 2;
-      const title = requireString(row['Title (required)'], 'Title', excelRow);
-      const category = requireString(row['Category (required)'], 'Category', excelRow) as PublicationCategory;
-      if (!Object.values(PublicationCategory).includes(category)) {
-        throw new Error(
-          `Row ${excelRow}: invalid category "${category}" — must be COOKBOOK, LEGISLATIVE, or INTERNATIONAL_LITERATURE`,
-        );
-      }
-      const summary = requireString(row['Summary (required)'], 'Summary', excelRow);
-      const bodyText = requireString(row['Body text (required)'], 'Body text', excelRow);
-      const language = String(row['Language (optional, default uz)'] ?? 'uz').trim() || 'uz';
-      const tags = parseTags(row['Tags (optional, comma-separated)']);
-      const author = row['Author (optional)'] ? String(row['Author (optional)']).trim() : undefined;
-      const publishedAt = parseDate(row['Published date (optional, YYYY-MM-DD, blank = draft)']);
-
-      await prisma.publication.create({
-        data: { title, slug: slugify(title), category, summary, bodyText, language, tags, author, publishedAt },
-      });
-      publicationsCreated++;
-    }
-  }
 
   if (newsSheet) {
     const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(newsSheet);
@@ -128,7 +93,7 @@ async function main() {
   }
 
   console.log(
-    `Imported: ${publicationsCreated} publications, ${newsCreated} news articles, ${membershipTypesCreated} membership types.`,
+    `Imported: ${newsCreated} news articles, ${membershipTypesCreated} membership types.`,
   );
   await prisma.$disconnect();
 }

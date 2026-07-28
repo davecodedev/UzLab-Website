@@ -4,7 +4,7 @@ import { PrismaService } from '../../common/prisma/prisma.service.js';
 import { SearchQueryDto, SearchResultType } from './dto/search-query.dto.js';
 
 export interface SearchResultItem {
-  type: 'publication' | 'news' | 'member' | 'laboratory';
+  type: 'news' | 'member' | 'laboratory';
   id: string;
   title: string;
   summary: string;
@@ -33,7 +33,6 @@ export class SearchService {
     const hasKeyword = !!q && q.length >= 2;
     const hasAnyFilter =
       hasKeyword ||
-      !!query.category ||
       !!query.language ||
       !!query.author ||
       (query.tags && query.tags.length > 0) ||
@@ -48,19 +47,15 @@ export class SearchService {
 
     const wantsType = (type: SearchResultType) =>
       !query.type || query.type === type;
-    // category/language/tags/author only apply to Publications, region/
-    // labField only to Laboratories — if one of those is the *only* filter
-    // set, other types have nothing to match against and must return empty
-    // rather than "everything".
+    // region/labField only apply to Laboratories — if one of those is the
+    // *only* filter set, other types have nothing to match against and must
+    // return empty rather than "everything".
     const hasNewsApplicableFilter =
       hasKeyword || !!query.dateFrom || !!query.dateTo;
     const hasLabApplicableFilter =
       hasKeyword || !!query.region || !!query.labField || !!query.dateFrom || !!query.dateTo;
 
-    const [publications, news, members, laboratories] = await Promise.all([
-      wantsType(SearchResultType.PUBLICATION)
-        ? this.searchPublications(q, query)
-        : Promise.resolve([]),
+    const [news, members, laboratories] = await Promise.all([
       wantsType(SearchResultType.NEWS) && hasNewsApplicableFilter
         ? this.searchNews(q, query)
         : Promise.resolve([]),
@@ -72,55 +67,7 @@ export class SearchService {
         : Promise.resolve([]),
     ]);
 
-    return [...publications, ...news, ...members, ...laboratories];
-  }
-
-  private async searchPublications(
-    q: string | undefined,
-    filters: SearchQueryDto,
-  ): Promise<SearchResultItem[]> {
-    const where: Prisma.PublicationWhereInput = {
-      deletedAt: null,
-      category: filters.category,
-      language: filters.language,
-      author: filters.author
-        ? { contains: filters.author, mode: 'insensitive' }
-        : undefined,
-      tags:
-        filters.tags && filters.tags.length > 0
-          ? { hasSome: filters.tags }
-          : undefined,
-      publishedAt: {
-        not: null,
-        ...this.dateRange(filters.dateFrom, filters.dateTo),
-      },
-      ...(q && {
-        OR: [
-          { title: { contains: q, mode: 'insensitive' } },
-          { summary: { contains: q, mode: 'insensitive' } },
-          { bodyText: { contains: q, mode: 'insensitive' } },
-          { tags: { has: q } },
-        ],
-      }),
-    };
-
-    const results = await this.prisma.publication.findMany({
-      where,
-      take: RESULTS_PER_TYPE,
-    });
-
-    return results.map((p) => ({
-      type: 'publication',
-      id: p.id,
-      title: p.title,
-      summary: p.summary,
-      url: `/publications/${p.slug}`,
-      category: p.category,
-      language: p.language,
-      tags: p.tags,
-      author: p.author,
-      publishedAt: p.publishedAt?.toISOString() ?? null,
-    }));
+    return [...news, ...members, ...laboratories];
   }
 
   private async searchNews(

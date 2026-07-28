@@ -87,7 +87,7 @@ function Logo() {
   return (
     <Link href="/" className="flex flex-none items-center">
       {/* eslint-disable-next-line @next/next/no-img-element -- fixed-height logo, next/image adds no value here */}
-      <img src="/logo-uzlab.png" alt="UzLab" className="h-[30px] w-auto" />
+      <img src="/logo-uzlab.png" alt="UzLab" className="h-[38px] w-auto" />
     </Link>
   );
 }

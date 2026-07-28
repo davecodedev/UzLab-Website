@@ -9,7 +9,6 @@ const ADMIN_LINKS = [
   { href: "/admin", label: "Dashboard" },
   { href: "/admin/membership-types", label: "Membership Types" },
   { href: "/admin/applications", label: "Applications" },
-  { href: "/admin/publications", label: "Publications" },
   { href: "/admin/laboratories", label: "Laboratories" },
   { href: "/admin/news", label: "News" },
   { href: "/admin/contact", label: "Contact & Feedback" },

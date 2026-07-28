@@ -109,35 +109,6 @@ model Member {
   @@index([isDirectoryListed])
 }
 
-// --- Publications & Resources -------------------------------------------
-
-enum PublicationCategory {
-  COOKBOOK
-  LEGISLATIVE
-  INTERNATIONAL_LITERATURE
-}
-
-model Publication {
-  id          String              @id @default(uuid())
-  title       String
-  slug        String              @unique
-  category    PublicationCategory
-  summary     String
-  bodyText    String // plain-text content used for search indexing
-  fileUrl     String? // object storage key, if a document is attached
-  language    String              @default("uz")
-  tags        String[]            @default([])
-  author      String?
-  publishedAt DateTime?
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
-  deletedAt   DateTime?
-
-  @@index([category])
-  @@index([publishedAt])
-  @@index([deletedAt])
-}
-
 // --- Laboratory Registry --------------------------------------------------
 // A public directory of laboratories (not necessarily UzLab members) —
 // distinct from Member/MembershipType above, which track the association's

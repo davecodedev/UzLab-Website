@@ -6,7 +6,6 @@ import { useLang, pick } from "@/lib/i18n";
 const FOOTER_DICT = {
   about: { ru: "О нас", uz: "Biz haqimizda", en: "About" },
   membership: { ru: "Членство", uz: "A'zolik", en: "Membership" },
-  publications: { ru: "Публикации", uz: "Nashrlar", en: "Publications" },
   contact: { ru: "Контакты", uz: "Aloqa", en: "Contact" },
   address: {
     ru: "Ташкент, ул. Мустакиллик, 45",
@@ -20,7 +19,6 @@ export function Footer() {
   const links = [
     { href: "/about", label: pick(FOOTER_DICT.about, lang) },
     { href: "/membership", label: pick(FOOTER_DICT.membership, lang) },
-    { href: "/publications", label: pick(FOOTER_DICT.publications, lang) },
     { href: "/contact", label: pick(FOOTER_DICT.contact, lang) },
   ];
 
