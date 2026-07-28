@@ -165,6 +165,15 @@ enum LaboratorySource {
   MANUAL_ENTRY
 }
 
+// Uzbekistan runs more than one national register, and a single physical
+// laboratory can legitimately appear in several of them under different
+// numbers — O'zAkk accreditation and Depstan measurement-approval are
+// separate authorisations, not duplicates of each other.
+enum NationalRegister {
+  AKKRED // akkred.uz — O'zbekiston akkreditatsiya markazi (O'ZAKK)
+  DEPSTAN // approval.depstan.uz — testing-laboratory approval register
+}
+
 model Laboratory {
   id                  String              @id @default(uuid())
   name                String
@@ -189,6 +198,8 @@ model Laboratory {
   // --- National register detail (O'zAkk / akkred.uz) --------------------
   // Populated by scripts/import-akkred-registry.ts from the public register
   // API. All optional: a self-registered lab has none of these.
+  register             NationalRegister? // which national register this row came from
+  registerStatusLabel  String? // the register's own status wording, before mapping to the enum
   bodyType             ConformityBodyType? // which kind of conformity-assessment body
   bodyTypeLabel        String? // O'zAkk's own Uzbek label for the type
   isLaboratory         Boolean             @default(true) // false for certification/inspection bodies
@@ -217,6 +228,7 @@ model Laboratory {
   @@index([bodyType])
   @@index([isLaboratory])
   @@index([taxId])
+  @@index([register])
 }
 
 // --- Media & Contact -----------------------------------------------------

@@ -6,8 +6,9 @@ import { useLang, pick, type Lang } from "@/lib/i18n";
 
 // Shape of GET /laboratories/{slug} — the full Prisma `Laboratory` record.
 // See apps/api/prisma/schema.prisma (model Laboratory). Everything under
-// "National register detail" is imported from Uzbekistan's national register
-// (akkred.uz) and is optional: a self-registered lab has none of it.
+// "National register detail" is imported from one of Uzbekistan's two national
+// registers — `register` says which — and is optional: a self-registered lab
+// has none of it.
 export interface Laboratory {
   id: string;
   name: string;
@@ -27,6 +28,8 @@ export interface Laboratory {
   description: string | null;
   isUzLabMember: boolean;
 
+  register: string | null;
+  registerStatusLabel: string | null;
   bodyType: string | null;
   bodyTypeLabel: string | null;
   isLaboratory: boolean;
@@ -82,6 +85,12 @@ const T = {
     ru: "Орган аккредитации",
     uz: "Akkreditatsiya organi",
     en: "Accreditation body",
+  },
+  register: { ru: "Национальный реестр", uz: "Milliy reyestr", en: "National register" },
+  registerStatus: {
+    ru: "Статус по реестру",
+    uz: "Reyestr bo'yicha holat",
+    en: "Status per the register",
   },
   standard: { ru: "Нормативный документ", uz: "Normativ hujjat", en: "Standard" },
   bodyType: { ru: "Тип органа", uz: "Organ turi", en: "Body type" },
@@ -158,6 +167,22 @@ const STATUS_COLORS: Record<string, { bg: string; fg: string }> = {
   WITHDRAWN: { bg: "var(--uz-error-bg)", fg: "var(--uz-error)" },
   PENDING: { bg: "var(--uz-blue-50)", fg: "var(--uz-blue-700)" },
   UNKNOWN: { bg: "var(--uz-bg-sunken)", fg: "var(--uz-text-muted)" },
+};
+
+// NationalRegister — which of the two national registers the record came from.
+// One organisation may hold entries in both under different numbers; those are
+// separate authorisations, not duplicates.
+const REGISTER_LABELS: Record<string, L10n> = {
+  AKKRED: {
+    ru: "Реестр аккредитации O'zAkk (akkred.uz)",
+    uz: "O'zAkk akkreditatsiya reyestri (akkred.uz)",
+    en: "O'zAkk accreditation register (akkred.uz)",
+  },
+  DEPSTAN: {
+    ru: "Реестр одобрения испытательных лабораторий (approval.depstan.uz)",
+    uz: "Sinov laboratoriyalarini ma'qullash reyestri (approval.depstan.uz)",
+    en: "Testing-laboratory approval register (approval.depstan.uz)",
+  },
 };
 
 // ConformityBodyType — the register covers more than laboratories.
@@ -309,9 +334,13 @@ export function LaboratoryDetailView({ lab }: { lab: Laboratory }) {
   const statusColor = STATUS_COLORS[lab.accreditationStatus] ?? STATUS_COLORS.UNKNOWN;
   const bodyTypeEntry = lab.bodyType ? BODY_TYPE_LABELS[lab.bodyType] : undefined;
   const bodyType = bodyTypeEntry ? pick(bodyTypeEntry, lang) : null;
+  const registerEntry = lab.register ? REGISTER_LABELS[lab.register] : undefined;
+  const register = registerEntry ? pick(registerEntry, lang) : lab.register;
 
   const accreditationRows: Row[] = [
     ...row(t("accreditationNumber"), lab.accreditationNumber),
+    // Which national register this record was imported from.
+    ...row(t("register"), register),
     ...row(t("accreditationBody"), lab.accreditationBody),
     ...row(t("standard"), lab.standard),
     ...row(t("bodyType"), bodyType),
@@ -321,6 +350,9 @@ export function LaboratoryDetailView({ lab }: { lab: Laboratory }) {
     ...row(t("reAccreditationDate"), formatDate(lab.reAccreditationDate, lang)),
     ...row(t("accreditedUntil"), formatDate(lab.accreditedUntil, lang)),
     ...row(t("statusDate"), formatDate(lab.statusDate, lang)),
+    // The register's own status wording, before mapping to our enum —
+    // rendered verbatim, never translated.
+    ...row(t("registerStatus"), lab.registerStatusLabel),
   ];
 
   const organisationRows: Row[] = [

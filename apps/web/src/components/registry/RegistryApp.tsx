@@ -7,6 +7,7 @@ import {
   BODY_TYPE_OPTIONS,
   EMPTY_FILTERS,
   REGION_OPTIONS,
+  REGISTER_OPTIONS,
   STATUS_OPTIONS,
   UNSPECIFIED_REGION,
   UNSPECIFIED_REGION_LABEL,
@@ -15,6 +16,7 @@ import {
   hasActiveFilters,
   matches,
   regionLabel,
+  registerLabel,
   statusLabel,
   type Laboratory,
   type RegistryFilters,
@@ -79,6 +81,13 @@ const UI = {
   clearAll: { ru: "Очистить всё", uz: "Barchasini tozalash", en: "Clear all" },
   regNo: { ru: "Регистрационный номер", uz: "Ro'yxat raqami", en: "Registry number" },
   orgName: { ru: "Название организации", uz: "Tashkilot nomi", en: "Organization name" },
+  register: { ru: "Реестр", uz: "Reyestr", en: "Register" },
+  anyRegister: { ru: "Все реестры", uz: "Barcha reyestrlar", en: "All registers" },
+  registerHint: {
+    ru: "Записи поступают из двух национальных реестров; одна организация может числиться в обоих под разными номерами",
+    uz: "Yozuvlar ikkita milliy reyestrdan keladi; bitta tashkilot har ikkalasida turli raqamlar ostida bo'lishi mumkin",
+    en: "Records come from two national registers; one organisation may appear in both under different numbers",
+  },
   bodyType: { ru: "Тип органа", uz: "Organ turi", en: "Body type" },
   anyType: { ru: "Любой тип", uz: "Har qanday turi", en: "Any type" },
   taxId: { ru: "ИНН (СТИР)", uz: "STIR", en: "TIN (STIR)" },
@@ -135,6 +144,9 @@ const UI = {
   clearFiltersBtn: { ru: "Сбросить все фильтры", uz: "Barcha filtrlarni tozalash", en: "Clear all filters" },
   colRegNo: { ru: "Рег. №", uz: "Ro'yxat №", en: "Reg. No." },
   colOrg: { ru: "Организация", uz: "Tashkilot", en: "Organization" },
+  colRegister: { ru: "Реестр", uz: "Reyestr", en: "Register" },
+  byRegister: { ru: "По реестрам", uz: "Reyestrlar bo'yicha", en: "By register" },
+  noRegister: { ru: "Без реестра", uz: "Reyestrsiz", en: "No register" },
   colType: { ru: "Тип органа", uz: "Organ turi", en: "Body type" },
   colTaxId: { ru: "ИНН", uz: "STIR", en: "TIN" },
   colRegion: { ru: "Регион", uz: "Hudud", en: "Region" },
@@ -247,6 +259,24 @@ export function RegistryApp({ laboratories }: { laboratories: Laboratory[] }) {
     }
     return counts;
   }, [filtered]);
+
+  // Split of the filtered results by source register. A record created by hand
+  // has no register at all, so those are counted separately rather than hidden.
+  const registerRows = useMemo(() => {
+    const counts: Record<string, number> = {};
+    let none = 0;
+    for (const lab of filtered) {
+      if (lab.register) counts[lab.register] = (counts[lab.register] ?? 0) + 1;
+      else none += 1;
+    }
+    const rows = REGISTER_OPTIONS.map((r) => ({
+      value: r.value,
+      label: r.label[lang],
+      count: counts[r.value] ?? 0,
+    })).filter((r) => r.count > 0);
+    if (none > 0) rows.push({ value: "", label: t("noRegister", lang), count: none });
+    return rows;
+  }, [filtered, lang]);
 
   const regionBuckets = useMemo(() => {
     const map = new Map<string, number>();
@@ -407,7 +437,13 @@ export function RegistryApp({ laboratories }: { laboratories: Laboratory[] }) {
             onSave={handleSaveView}
           />
 
-          <SummaryCard lang={lang} total={filtered.length} sentence={summarySentence} statusCounts={statusCounts} />
+          <SummaryCard
+            lang={lang}
+            total={filtered.length}
+            sentence={summarySentence}
+            statusCounts={statusCounts}
+            registerRows={registerRows}
+          />
 
           <div className="reg-print-hide mt-5 flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm" style={{ color: "var(--reg-gray-1)" }}>
@@ -550,6 +586,28 @@ function FiltersCard({
             className={inputClass()}
             style={{ border: "1px solid var(--reg-border)" }}
           />
+        </div>
+
+        <div>
+          <label className={labelClass()} style={{ color: "var(--reg-gray-2)" }}>
+            {t("register", lang)}
+          </label>
+          <select
+            value={filters.register}
+            onChange={(e) => updateFilter("register", e.target.value)}
+            className={`reg-select ${inputClass()}`}
+            style={{ border: "1px solid var(--reg-border)" }}
+          >
+            <option value="">{t("anyRegister", lang)}</option>
+            {REGISTER_OPTIONS.map((r) => (
+              <option key={r.value} value={r.value}>
+                {r.label[lang]}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-[11px] leading-snug" style={{ color: "var(--reg-gray-2)" }}>
+            {t("registerHint", lang)}
+          </p>
         </div>
 
         <div>
@@ -815,16 +873,24 @@ function SavedViewsBar({
 
 // --- Summary card --------------------------------------------------------
 
+interface RegisterRow {
+  value: string;
+  label: string;
+  count: number;
+}
+
 function SummaryCard({
   lang,
   total,
   sentence,
   statusCounts,
+  registerRows,
 }: {
   lang: Lang;
   total: number;
   sentence: string;
   statusCounts: Record<string, number>;
+  registerRows: RegisterRow[];
 }) {
   const base = Math.max(1, total);
   return (
@@ -846,6 +912,28 @@ function SummaryCard({
           <p className="mt-2 max-w-[440px] text-sm leading-relaxed" style={{ color: "rgba(255,255,255,0.9)" }}>
             {sentence}
           </p>
+          {registerRows.length > 0 && (
+            <div className="mt-4">
+              <p
+                className="reg-mono text-[10px] font-semibold uppercase tracking-[0.08em]"
+                style={{ color: "rgba(255,255,255,0.75)" }}
+              >
+                {t("byRegister", lang)}
+              </p>
+              <div className="mt-1.5 flex flex-wrap gap-2">
+                {registerRows.map((r) => (
+                  <span
+                    key={r.value || "__none__"}
+                    className="rounded-full px-2.5 py-1 text-xs font-medium text-white"
+                    style={{ background: "rgba(255,255,255,0.18)" }}
+                  >
+                    {r.label}
+                    <span className="reg-mono ml-1.5 font-bold">{r.count}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
         <div className="grid grid-cols-2 gap-x-8 gap-y-4 md:flex-none">
           {STATUS_ORDER.map((s) => {
@@ -914,10 +1002,10 @@ function StatusPill({ status, lang }: { status: string; lang: Lang }) {
 function TableView({ lang, laboratories }: { lang: Lang; laboratories: Laboratory[] }) {
   return (
     <div className="mt-4 overflow-x-auto rounded-[14px] bg-white" style={{ border: "1px solid var(--reg-border)" }}>
-      <table className="w-full min-w-[900px] border-collapse text-sm">
+      <table className="w-full min-w-[1020px] border-collapse text-sm">
         <thead>
           <tr style={{ background: "var(--reg-panel)" }}>
-            {(["colRegNo", "colOrg", "colType", "colTaxId", "colRegion", "colStatus"] as const).map((k) => (
+            {(["colRegNo", "colOrg", "colRegister", "colType", "colTaxId", "colRegion", "colStatus"] as const).map((k) => (
               <th
                 key={k}
                 className="reg-mono px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em]"
@@ -946,6 +1034,14 @@ function TableView({ lang, laboratories }: { lang: Lang; laboratories: Laborator
                 {lab.standard && (
                   <div className="reg-mono mt-0.5 text-[11px]" style={{ color: "var(--reg-gray-3)" }}>
                     {lab.standard}
+                  </div>
+                )}
+              </td>
+              <td className="px-4 py-3 align-top" style={{ color: "var(--reg-gray-1)" }}>
+                {registerLabel(lab.register, lang)}
+                {lab.registerStatusLabel && (
+                  <div className="mt-0.5 text-[11px]" style={{ color: "var(--reg-gray-3)" }}>
+                    {lab.registerStatusLabel}
                   </div>
                 )}
               </td>
@@ -1016,6 +1112,9 @@ function CardsView({ lang, laboratories }: { lang: Lang; laboratories: Laborator
             </span>
           )}
           <dl className="mt-3 text-xs">
+            {lab.register && (
+              <CardRow label={t("colRegister", lang)} value={registerLabel(lab.register, lang)} />
+            )}
             <CardRow label={t("colType", lang)} value={bodyTypeLabel(lab.bodyType, lang)} />
             {lab.taxId && <CardRow label={t("colTaxId", lang)} value={lab.taxId} mono />}
             <CardRow label={t("colRegion", lang)} value={regionLabel(lab.region, lang)} />

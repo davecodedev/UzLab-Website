@@ -25,6 +25,7 @@ import {
   LaboratoryField,
   AccreditationStatus,
   ConformityBodyType,
+  NationalRegister,
 } from '@prisma/client';
 import { slugify } from '../src/common/utils/slugify';
 
@@ -220,6 +221,8 @@ async function main() {
         source: 'GOVERNMENT_IMPORT' as const,
         isPublished: true,
 
+        register: NationalRegister.AKKRED,
+        registerStatusLabel: clean(row.status),
         bodyType,
         bodyTypeLabel: clean(row.type_std?.full),
         isLaboratory,

@@ -1,5 +1,11 @@
 import type { Lang } from "@/lib/i18n";
-import { bodyTypeLabel, regionLabel, statusLabel, type Laboratory } from "./registry-data";
+import {
+  bodyTypeLabel,
+  regionLabel,
+  registerLabel,
+  statusLabel,
+  type Laboratory,
+} from "./registry-data";
 
 // Column keys, in export order. Every one is backed by a real field on the
 // `Laboratory` payload returned by GET /api/laboratories — `scopeText` is
@@ -7,6 +13,7 @@ import { bodyTypeLabel, regionLabel, statusLabel, type Laboratory } from "./regi
 type ColumnKey =
   | "regNo"
   | "org"
+  | "register"
   | "bodyType"
   | "taxId"
   | "legalEntity"
@@ -21,6 +28,7 @@ type ColumnKey =
   | "email"
   | "website"
   | "status"
+  | "registerStatusLabel"
   | "statusDate"
   | "body"
   | "accreditedFrom"
@@ -33,6 +41,7 @@ const EXPORT_HEADERS: Record<Lang, Record<ColumnKey, string>> = {
   ru: {
     regNo: "Рег. номер",
     org: "Организация",
+    register: "Реестр",
     bodyType: "Тип органа",
     taxId: "ИНН (СТИР)",
     legalEntity: "Юридическое лицо",
@@ -47,6 +56,7 @@ const EXPORT_HEADERS: Record<Lang, Record<ColumnKey, string>> = {
     email: "Эл. почта",
     website: "Сайт",
     status: "Статус",
+    registerStatusLabel: "Статус по реестру",
     statusDate: "Дата статуса",
     body: "Орган аккредитации",
     accreditedFrom: "Дата аккредитации",
@@ -58,6 +68,7 @@ const EXPORT_HEADERS: Record<Lang, Record<ColumnKey, string>> = {
   uz: {
     regNo: "Ro'yxat raqami",
     org: "Tashkilot",
+    register: "Reyestr",
     bodyType: "Organ turi",
     taxId: "STIR",
     legalEntity: "Yuridik shaxs",
@@ -72,6 +83,7 @@ const EXPORT_HEADERS: Record<Lang, Record<ColumnKey, string>> = {
     email: "Elektron pochta",
     website: "Veb-sayt",
     status: "Holat",
+    registerStatusLabel: "Reyestrdagi holat",
     statusDate: "Holat sanasi",
     body: "Akkreditatsiya organi",
     accreditedFrom: "Akkreditatsiya sanasi",
@@ -83,6 +95,7 @@ const EXPORT_HEADERS: Record<Lang, Record<ColumnKey, string>> = {
   en: {
     regNo: "Reg. No.",
     org: "Organization",
+    register: "Register",
     bodyType: "Body type",
     taxId: "TIN (STIR)",
     legalEntity: "Legal entity",
@@ -97,6 +110,7 @@ const EXPORT_HEADERS: Record<Lang, Record<ColumnKey, string>> = {
     email: "Email",
     website: "Website",
     status: "Status",
+    registerStatusLabel: "Status per the register",
     statusDate: "Status date",
     body: "Accreditation body",
     accreditedFrom: "Accreditation date",
@@ -120,6 +134,7 @@ function exportColumns(lab: Laboratory, lang: Lang): Record<string, string> {
   return {
     [headers.regNo]: lab.accreditationNumber ?? "",
     [headers.org]: lab.name,
+    [headers.register]: lab.register ? registerLabel(lab.register, lang) : "",
     [headers.bodyType]: lab.bodyType ? bodyTypeLabel(lab.bodyType, lang) : (lab.bodyTypeLabel ?? ""),
     [headers.taxId]: lab.taxId ?? "",
     [headers.legalEntity]: lab.legalEntityName ?? "",
@@ -134,6 +149,8 @@ function exportColumns(lab: Laboratory, lang: Lang): Record<string, string> {
     [headers.email]: lab.email ?? "",
     [headers.website]: lab.website ?? "",
     [headers.status]: statusLabel(lab.accreditationStatus, lang),
+    // The source register's own wording, verbatim — never translated.
+    [headers.registerStatusLabel]: lab.registerStatusLabel ?? "",
     [headers.statusDate]: fmtDate(lab.statusDate),
     [headers.body]: lab.accreditationBody ?? "",
     [headers.accreditedFrom]: fmtDate(lab.accreditationDate),

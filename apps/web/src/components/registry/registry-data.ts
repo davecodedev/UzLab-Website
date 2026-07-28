@@ -4,10 +4,14 @@ import type { Lang } from "@/lib/i18n";
 // Real data shape only. Matches apps/api/src/modules/laboratories exactly —
 // see apps/api/prisma/schema.prisma and GET /api/laboratories.
 //
-// The register is imported from Uzbekistan's national accreditation register
-// (akkred.uz) via its public API — see apps/api/scripts/import-akkred-registry.ts.
-// It covers every conformity-assessment body, not only laboratories, so
-// `isLaboratory` / `bodyType` distinguish them.
+// Records come from two national registers, distinguished by `register`:
+// AKKRED — Uzbekistan's national accreditation register (akkred.uz), which
+// covers every conformity-assessment body, not only laboratories, so
+// `isLaboratory` / `bodyType` distinguish them; and DEPSTAN — the
+// testing-laboratory measurement-approval register (approval.depstan.uz),
+// every row of which is a testing laboratory. The same organisation may hold
+// authorisations in both registers under different numbers — those are two
+// separate records, not duplicates.
 //
 // `scopeText` (the full scope-of-accreditation table) is deliberately NOT part
 // of this type: the API omits it from list responses because it totals ~10.5 MB
@@ -35,6 +39,10 @@ export interface Laboratory {
   source: string;
 
   // National-register detail
+  /** NationalRegister enum — AKKRED (akkred.uz) or DEPSTAN (approval.depstan.uz). */
+  register: string | null;
+  /** The register's own status wording, before mapping to `accreditationStatus`. */
+  registerStatusLabel: string | null;
   bodyType: string | null;
   bodyTypeLabel: string | null;
   isLaboratory: boolean;
@@ -56,6 +64,8 @@ export const UNSPECIFIED_REGION = "__unspecified__";
 export interface RegistryFilters {
   regNo: string;
   orgName: string;
+  /** NationalRegister — which national register a record came from. */
+  register: string;
   /** ConformityBodyType — the register's own body-type discriminator. */
   bodyType: string;
   region: string;
@@ -77,6 +87,7 @@ export interface RegistryFilters {
 export const EMPTY_FILTERS: RegistryFilters = {
   regNo: "",
   orgName: "",
+  register: "",
   bodyType: "",
   region: "",
   status: "",
@@ -92,6 +103,7 @@ export function hasActiveFilters(f: RegistryFilters): boolean {
   return Boolean(
     f.regNo ||
       f.orgName ||
+      f.register ||
       f.bodyType ||
       f.region ||
       f.status ||
@@ -110,6 +122,29 @@ interface LocalizedOption {
   value: string;
   label: Record<Lang, string>;
 }
+
+// NationalRegister enum. Record counts at time of import: 807 AKKRED
+// (akkred.uz — O'zAkk accreditation), 2333 DEPSTAN (approval.depstan.uz —
+// testing-laboratory measurement approval). A record created by hand has
+// neither.
+export const REGISTER_OPTIONS: LocalizedOption[] = [
+  {
+    value: "AKKRED",
+    label: {
+      ru: "Аккредитация (O'zAkk)",
+      uz: "Akkreditatsiya (O'zAkk)",
+      en: "Accreditation (O'zAkk)",
+    },
+  },
+  {
+    value: "DEPSTAN",
+    label: {
+      ru: "Одобрение испыт. лабораторий (Depstan)",
+      uz: "Sinov laboratoriyalari ma'qullash (Depstan)",
+      en: "Testing-lab approval (Depstan)",
+    },
+  },
+];
 
 // ConformityBodyType enum — every value in the Prisma schema, laboratories
 // first. Counts in the live register at time of import: 401 testing,
@@ -317,6 +352,11 @@ export function labelFor(options: LocalizedOption[], value: string, lang: Lang):
   return options.find((o) => o.value === value)?.label[lang] ?? value;
 }
 
+export function registerLabel(value: string | null, lang: Lang): string {
+  if (!value) return "—";
+  return labelFor(REGISTER_OPTIONS, value, lang);
+}
+
 export function bodyTypeLabel(value: string | null, lang: Lang): string {
   if (!value) return "—";
   return labelFor(BODY_TYPE_OPTIONS, value, lang);
@@ -343,6 +383,7 @@ export function matches(lab: Laboratory, f: RegistryFilters): boolean {
   if (f.orgName && !(includesCI(lab.name, f.orgName) || includesCI(lab.legalEntityName, f.orgName))) {
     return false;
   }
+  if (f.register && lab.register !== f.register) return false;
   if (f.bodyType && lab.bodyType !== f.bodyType) return false;
   if (f.region) {
     if (f.region === UNSPECIFIED_REGION) {
@@ -392,6 +433,7 @@ export function composeFilterLabel(f: RegistryFilters, lang: Lang): string {
   const L = {
     regNo: { ru: "№", uz: "№", en: "No." },
     org: { ru: "Название", uz: "Nomi", en: "Name" },
+    register: { ru: "Реестр", uz: "Reyestr", en: "Register" },
     type: { ru: "Тип", uz: "Turi", en: "Type" },
     region: { ru: "Регион", uz: "Hudud", en: "Region" },
     status: { ru: "Статус", uz: "Holat", en: "Status" },
@@ -406,6 +448,7 @@ export function composeFilterLabel(f: RegistryFilters, lang: Lang): string {
   if (f.labsOnly) parts.push(L.labsOnly[lang]);
   if (f.regNo) parts.push(`${L.regNo[lang]}: ${f.regNo}`);
   if (f.orgName) parts.push(`${L.org[lang]}: ${f.orgName}`);
+  if (f.register) parts.push(`${L.register[lang]}: ${registerLabel(f.register, lang)}`);
   if (f.bodyType) parts.push(`${L.type[lang]}: ${bodyTypeLabel(f.bodyType, lang)}`);
   if (f.region) {
     parts.push(
