@@ -1,4 +1,5 @@
 import { RegistryApp } from "@/components/registry/RegistryApp";
+import { AddLaboratoryPrompt } from "@/components/registry/AddLaboratoryPrompt";
 import type { Laboratory } from "@/components/registry/registry-data";
 import { api } from "@/lib/api";
 
@@ -14,5 +15,10 @@ async function getLaboratories(): Promise<Laboratory[]> {
 
 export default async function LaboratoriesPage() {
   const laboratories = await getLaboratories();
-  return <RegistryApp laboratories={laboratories} />;
+  return (
+    <>
+      <RegistryApp laboratories={laboratories} />
+      <AddLaboratoryPrompt />
+    </>
+  );
 }

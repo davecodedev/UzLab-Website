@@ -1,6 +1,7 @@
 import type { Lang } from "@/lib/i18n";
 import {
   bodyTypeLabel,
+  isSelfRegistered,
   regionLabel,
   registerLabel,
   statusLabel,
@@ -134,7 +135,10 @@ function exportColumns(lab: Laboratory, lang: Lang): Record<string, string> {
   return {
     [headers.regNo]: lab.accreditationNumber ?? "",
     [headers.org]: lab.name,
-    [headers.register]: lab.register ? registerLabel(lab.register, lang) : "",
+    // Member-added entries have no register but are still labelled, so an
+    // exported row says where it came from rather than leaving the cell blank.
+    [headers.register]:
+      lab.register || isSelfRegistered(lab) ? registerLabel(lab.register, lang, lab.source) : "",
     [headers.bodyType]: lab.bodyType ? bodyTypeLabel(lab.bodyType, lang) : (lab.bodyTypeLabel ?? ""),
     [headers.taxId]: lab.taxId ?? "",
     [headers.legalEntity]: lab.legalEntityName ?? "",

@@ -61,6 +61,26 @@ export interface Laboratory {
 /** Sentinel filter/bucket value for records whose `region` column is null. */
 export const UNSPECIFIED_REGION = "__unspecified__";
 
+/** `Laboratory.source` for an entry a member added themselves. */
+export const SELF_REGISTERED_SOURCE = "SELF_REGISTERED";
+
+/**
+ * Sentinel filter/bucket value for member-added entries. Those rows are in
+ * neither national register, so `register` is null and they match neither
+ * AKKRED nor DEPSTAN — without a value of their own they would be unreachable
+ * through the register filter. Mirrors UNSPECIFIED_REGION above.
+ */
+export const SELF_REGISTERED = "__self_registered__";
+
+/**
+ * True for an entry supplied by a member rather than imported from a national
+ * register. Both halves matter: `register` null alone also covers hand-created
+ * MANUAL_ENTRY records, which are not self-declared.
+ */
+export function isSelfRegistered(lab: Pick<Laboratory, "register" | "source">): boolean {
+  return !lab.register && lab.source === SELF_REGISTERED_SOURCE;
+}
+
 export interface RegistryFilters {
   regNo: string;
   orgName: string;
@@ -127,6 +147,11 @@ interface LocalizedOption {
 // (akkred.uz — O'zAkk accreditation), 2333 DEPSTAN (approval.depstan.uz —
 // testing-laboratory measurement approval). A record created by hand has
 // neither.
+//
+// The third option is not a register at all: it is the SELF_REGISTERED sentinel
+// for laboratories a member added because they are in neither national
+// register. It sits in this list so the filter dropdown, the summary chips and
+// registerLabel() all resolve it the same way as a real register.
 export const REGISTER_OPTIONS: LocalizedOption[] = [
   {
     value: "AKKRED",
@@ -142,6 +167,14 @@ export const REGISTER_OPTIONS: LocalizedOption[] = [
       ru: "Одобрение испыт. лабораторий (Depstan)",
       uz: "Sinov laboratoriyalari ma'qullash (Depstan)",
       en: "Testing-lab approval (Depstan)",
+    },
+  },
+  {
+    value: SELF_REGISTERED,
+    label: {
+      ru: "Добавлено участником",
+      uz: "Ishtirokchi qo'shgan",
+      en: "Added by a member",
     },
   },
 ];
@@ -352,8 +385,17 @@ export function labelFor(options: LocalizedOption[], value: string, lang: Lang):
   return options.find((o) => o.value === value)?.label[lang] ?? value;
 }
 
-export function registerLabel(value: string | null, lang: Lang): string {
-  if (!value) return "—";
+/**
+ * Label for a record's origin. `source` is optional so filter values (which
+ * carry no record) can be labelled too; pass it for a record, so a
+ * member-added entry reads as such instead of as a missing register.
+ */
+export function registerLabel(value: string | null, lang: Lang, source?: string | null): string {
+  if (!value) {
+    return source === SELF_REGISTERED_SOURCE
+      ? labelFor(REGISTER_OPTIONS, SELF_REGISTERED, lang)
+      : "—";
+  }
   return labelFor(REGISTER_OPTIONS, value, lang);
 }
 
@@ -383,7 +425,13 @@ export function matches(lab: Laboratory, f: RegistryFilters): boolean {
   if (f.orgName && !(includesCI(lab.name, f.orgName) || includesCI(lab.legalEntityName, f.orgName))) {
     return false;
   }
-  if (f.register && lab.register !== f.register) return false;
+  if (f.register) {
+    if (f.register === SELF_REGISTERED) {
+      if (!isSelfRegistered(lab)) return false;
+    } else if (lab.register !== f.register) {
+      return false;
+    }
+  }
   if (f.bodyType && lab.bodyType !== f.bodyType) return false;
   if (f.region) {
     if (f.region === UNSPECIFIED_REGION) {
@@ -448,6 +496,8 @@ export function composeFilterLabel(f: RegistryFilters, lang: Lang): string {
   if (f.labsOnly) parts.push(L.labsOnly[lang]);
   if (f.regNo) parts.push(`${L.regNo[lang]}: ${f.regNo}`);
   if (f.orgName) parts.push(`${L.org[lang]}: ${f.orgName}`);
+  // The SELF_REGISTERED sentinel is one of REGISTER_OPTIONS, so it labels
+  // itself here exactly like AKKRED or DEPSTAN.
   if (f.register) parts.push(`${L.register[lang]}: ${registerLabel(f.register, lang)}`);
   if (f.bodyType) parts.push(`${L.type[lang]}: ${bodyTypeLabel(f.bodyType, lang)}`);
   if (f.region) {

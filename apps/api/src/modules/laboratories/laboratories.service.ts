@@ -181,9 +181,15 @@ export class LaboratoriesService {
     });
   }
 
+  /**
+   * A member's own submissions, including rejected ones. Rejection soft-deletes
+   * the row to keep it out of every public listing, so filtering on
+   * `deletedAt: null` here would hide the rejection — and the reviewer's note
+   * with it — from the one person who needs to read it.
+   */
   listMySubmissions(userId: string) {
     return this.prisma.laboratory.findMany({
-      where: { submittedByUserId: userId, deletedAt: null },
+      where: { submittedByUserId: userId },
       orderBy: { submittedAt: 'desc' },
     });
   }

@@ -8,12 +8,14 @@ import {
   EMPTY_FILTERS,
   REGION_OPTIONS,
   REGISTER_OPTIONS,
+  SELF_REGISTERED,
   STATUS_OPTIONS,
   UNSPECIFIED_REGION,
   UNSPECIFIED_REGION_LABEL,
   bodyTypeLabel,
   composeFilterLabel,
   hasActiveFilters,
+  isSelfRegistered,
   matches,
   regionLabel,
   registerLabel,
@@ -84,9 +86,9 @@ const UI = {
   register: { ru: "Реестр", uz: "Reyestr", en: "Register" },
   anyRegister: { ru: "Все реестры", uz: "Barcha reyestrlar", en: "All registers" },
   registerHint: {
-    ru: "Записи поступают из двух национальных реестров; одна организация может числиться в обоих под разными номерами",
-    uz: "Yozuvlar ikkita milliy reyestrdan keladi; bitta tashkilot har ikkalasida turli raqamlar ostida bo'lishi mumkin",
-    en: "Records come from two national registers; one organisation may appear in both under different numbers",
+    ru: "Записи поступают из двух национальных реестров; одна организация может числиться в обоих под разными номерами. Записи, добавленные участниками, не значатся ни в одном из реестров.",
+    uz: "Yozuvlar ikkita milliy reyestrdan keladi; bitta tashkilot har ikkalasida turli raqamlar ostida bo'lishi mumkin. Ishtirokchilar qo'shgan yozuvlar hech qaysi reyestrda yo'q.",
+    en: "Records come from two national registers; one organisation may appear in both under different numbers. Entries added by members are in neither register.",
   },
   bodyType: { ru: "Тип органа", uz: "Organ turi", en: "Body type" },
   anyType: { ru: "Любой тип", uz: "Har qanday turi", en: "Any type" },
@@ -260,13 +262,16 @@ export function RegistryApp({ laboratories }: { laboratories: Laboratory[] }) {
     return counts;
   }, [filtered]);
 
-  // Split of the filtered results by source register. A record created by hand
-  // has no register at all, so those are counted separately rather than hidden.
+  // Split of the filtered results by source register. Entries a member added
+  // are bucketed under the SELF_REGISTERED sentinel — they belong to no
+  // register but are not nameless either. A record created by hand has neither,
+  // so those are counted separately rather than hidden.
   const registerRows = useMemo(() => {
     const counts: Record<string, number> = {};
     let none = 0;
     for (const lab of filtered) {
-      if (lab.register) counts[lab.register] = (counts[lab.register] ?? 0) + 1;
+      const key = lab.register ?? (isSelfRegistered(lab) ? SELF_REGISTERED : null);
+      if (key) counts[key] = (counts[key] ?? 0) + 1;
       else none += 1;
     }
     const rows = REGISTER_OPTIONS.map((r) => ({
@@ -1038,7 +1043,9 @@ function TableView({ lang, laboratories }: { lang: Lang; laboratories: Laborator
                 )}
               </td>
               <td className="px-4 py-3 align-top" style={{ color: "var(--reg-gray-1)" }}>
-                {registerLabel(lab.register, lang)}
+                {/* Member-added entries carry no register; `source` makes them
+                    read as self-declared rather than as a blank cell. */}
+                {registerLabel(lab.register, lang, lab.source)}
                 {lab.registerStatusLabel && (
                   <div className="mt-0.5 text-[11px]" style={{ color: "var(--reg-gray-3)" }}>
                     {lab.registerStatusLabel}
@@ -1112,8 +1119,11 @@ function CardsView({ lang, laboratories }: { lang: Lang; laboratories: Laborator
             </span>
           )}
           <dl className="mt-3 text-xs">
-            {lab.register && (
-              <CardRow label={t("colRegister", lang)} value={registerLabel(lab.register, lang)} />
+            {(lab.register || isSelfRegistered(lab)) && (
+              <CardRow
+                label={t("colRegister", lang)}
+                value={registerLabel(lab.register, lang, lab.source)}
+              />
             )}
             <CardRow label={t("colType", lang)} value={bodyTypeLabel(lab.bodyType, lang)} />
             {lab.taxId && <CardRow label={t("colTaxId", lang)} value={lab.taxId} mono />}

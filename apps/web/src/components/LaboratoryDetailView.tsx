@@ -29,6 +29,12 @@ export interface Laboratory {
   website: string | null;
   description: string | null;
   isUzLabMember: boolean;
+  /**
+   * LaboratorySource — how the record got here. "SELF_REGISTERED" means a
+   * member added it because it is in neither national register, so nothing on
+   * this page has been checked against an official source.
+   */
+  source: string;
 
   register: string | null;
   registerStatusLabel: string | null;
@@ -62,6 +68,21 @@ const T = {
     en: "← Laboratory register",
   },
   memberBadge: { ru: "Член UzLab", uz: "UzLab a'zosi", en: "UzLab member" },
+  selfRegisteredBadge: {
+    ru: "Добавлено участником",
+    uz: "Ishtirokchi qo'shgan",
+    en: "Added by a member",
+  },
+  selfRegisteredTitle: {
+    ru: "Запись не из национального реестра",
+    uz: "Yozuv milliy reyestrdan olinmagan",
+    en: "Not a national-register entry",
+  },
+  selfRegisteredNote: {
+    ru: "Эти сведения предоставила сама лаборатория. Записи нет ни в реестре аккредитации O'zAkk (akkred.uz), ни в реестре одобрения испытательных лабораторий (approval.depstan.uz), и они не сверялись с ними. Указанные здесь данные об аккредитации — заявление самой организации; проверяйте их у неё напрямую.",
+    uz: "Bu ma'lumotlarni laboratoriyaning o'zi taqdim etgan. Yozuv na O'zAkk akkreditatsiya reyestrida (akkred.uz), na sinov laboratoriyalarini ma'qullash reyestrida (approval.depstan.uz) mavjud va ular bilan solishtirilmagan. Bu yerdagi akkreditatsiya ma'lumotlari tashkilotning o'z bayonoti; ularni bevosita tashkilotdan tekshiring.",
+    en: "This detail was supplied by the laboratory itself. The entry appears in neither the O'zAkk accreditation register (akkred.uz) nor the testing-laboratory approval register (approval.depstan.uz), and it has not been verified against them. The accreditation details shown here are the organisation's own statement — confirm them with the laboratory directly.",
+  },
   notALaboratory: {
     ru: "Орган по оценке соответствия, не лаборатория",
     uz: "Muvofiqlikni baholash organi, laboratoriya emas",
@@ -368,6 +389,11 @@ export function LaboratoryDetailView({ lab }: { lab: Laboratory }) {
   const registerEntry = lab.register ? REGISTER_LABELS[lab.register] : undefined;
   const register = registerEntry ? pick(registerEntry, lang) : lab.register;
 
+  // A member added this laboratory because it is in neither national register.
+  // Nothing on the page has been checked against an official source, so the
+  // page has to say so rather than let it pass for a register record.
+  const selfRegistered = lab.source === "SELF_REGISTERED";
+
   const accreditationRows: Row[] = [
     ...row(t("accreditationNumber"), lab.accreditationNumber),
     // Which national register this record was imported from.
@@ -537,12 +563,35 @@ export function LaboratoryDetailView({ lab }: { lab: Laboratory }) {
             {bodyType}
           </span>
         )}
+        {selfRegistered && (
+          <span
+            className="rounded-full px-2.5 py-1 font-semibold"
+            style={{ background: "var(--uz-warning-bg)", color: "var(--uz-warning)" }}
+          >
+            {t("selfRegisteredBadge")}
+          </span>
+        )}
         {!lab.isLaboratory && (
           <span className="font-medium" style={{ color: "var(--uz-text-faint)" }}>
             {t("notALaboratory")}
           </span>
         )}
       </div>
+
+      {selfRegistered && (
+        <div
+          role="note"
+          className="mt-5 rounded-lg px-4 py-3"
+          style={{ background: "var(--uz-warning-bg)", border: "1px solid var(--uz-warning)" }}
+        >
+          <p className="text-sm font-semibold" style={{ color: "var(--uz-warning)" }}>
+            {t("selfRegisteredTitle")}
+          </p>
+          <p className="mt-1 text-sm leading-relaxed" style={{ color: "var(--uz-text)" }}>
+            {t("selfRegisteredNote")}
+          </p>
+        </div>
+      )}
 
       {lab.fields.length > 0 && (
         <div className="mt-4 flex flex-wrap gap-2">
