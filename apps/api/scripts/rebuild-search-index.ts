@@ -55,18 +55,24 @@ async function main() {
       if (batch.length === 0) break;
       cursor = batch[batch.length - 1].id;
 
-      // One statement per batch rather than per row: 3,000 sequential updates
-      // over the proxy connection is minutes, this is seconds.
-      await prisma.$transaction(
-        batch.map((lab) => {
-          const key = buildSearchKey(lab);
-          chars += key.length;
-          return prisma.laboratory.update({
-            where: { id: lab.id },
-            data: { searchText: key },
-          });
-        }),
-      );
+      // A single UPDATE ... FROM per batch. Wrapping 200 individual updates in
+      // a transaction exceeded Prisma's 5s limit over the proxy connection;
+      // this is one round trip and one statement.
+      const ids = batch.map((l) => l.id);
+      const keys = batch.map((l) => {
+        const key = buildSearchKey(l);
+        chars += key.length;
+        return key;
+      });
+
+      await prisma.$executeRaw`
+        UPDATE "Laboratory" AS l
+        SET "searchText" = v.key
+        FROM (
+          SELECT UNNEST(${ids}::text[]) AS id, UNNEST(${keys}::text[]) AS key
+        ) AS v
+        WHERE l."id" = v.id
+      `;
 
       processed += batch.length;
       if (processed % 1000 === 0 || processed === total) {

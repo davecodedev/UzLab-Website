@@ -14,6 +14,7 @@ import { slugify } from '../../common/utils/slugify.js';
 import { ListLaboratoriesDto } from './dto/list-laboratories.dto.js';
 import { SubmitLaboratoryDto, ReviewSubmissionDto } from './dto/submit-laboratory.dto.js';
 import { foldQueryTerms } from '../../common/utils/translit.js';
+import { buildSearchKey } from '../../common/utils/search-key.js';
 import { CreateLaboratoryDto } from './dto/create-laboratory.dto.js';
 import { UpdateLaboratoryDto } from './dto/update-laboratory.dto.js';
 
@@ -197,6 +198,8 @@ export class LaboratoriesService {
         fields: dto.fields ?? [],
         directions: dto.directions ?? [],
         isLaboratory: LABORATORY_BODY_TYPES.has(dto.bodyType),
+        // Member-added laboratories must be as findable as imported ones.
+        searchText: buildSearchKey({ ...rest, directions: dto.directions ?? [] }),
         source: 'SELF_REGISTERED',
         // No register: these are not in akkred.uz or approval.depstan.uz, which
         // is also what keeps the scheduled imports from ever touching them.

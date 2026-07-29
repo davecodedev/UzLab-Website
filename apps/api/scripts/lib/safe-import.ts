@@ -11,6 +11,10 @@
 // So a run must clear explicit thresholds before a single row is written, and
 // every run — including the refusals — is recorded in ImportRun.
 import type { NationalRegister, Prisma, PrismaClient } from '@prisma/client';
+import {
+  buildSearchKey,
+  type SearchableLaboratory,
+} from '../../src/common/utils/search-key';
 
 /**
  * Everything an importer writes for one record, minus the fields this module
@@ -197,12 +201,20 @@ export async function runImport(
         select: { id: true, disappearedAt: true },
       });
 
+      // Rebuild the search key from the incoming values. If this were left to
+      // a separate step, a refreshed record would keep matching its old name
+      // and scope until someone remembered to reindex.
+      const searchText = buildSearchKey({
+        ...(rec.data as SearchableLaboratory),
+        accreditationNumber: rec.accreditationNumber,
+      });
+
       if (existing) {
         if (existing.disappearedAt) reappeared++;
         await prisma.laboratory.update({
           where: { id: existing.id },
           // Keep the established slug — it is already in published URLs.
-          data: { ...rec.data, lastSeenAt: now, disappearedAt: null },
+          data: { ...rec.data, searchText, lastSeenAt: now, disappearedAt: null },
         });
         updated++;
       } else {
@@ -211,6 +223,7 @@ export async function runImport(
             ...rec.data,
             accreditationNumber: rec.accreditationNumber,
             slug: rec.slug,
+            searchText,
             lastSeenAt: now,
           },
         });

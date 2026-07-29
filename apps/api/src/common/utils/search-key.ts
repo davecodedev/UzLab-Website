@@ -1,4 +1,4 @@
-import { foldForSearch } from './translit.js';
+import { foldForSearch } from './translit';
 
 /** The fields that contribute to a laboratory's search key. */
 export interface SearchableLaboratory {
