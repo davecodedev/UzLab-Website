@@ -28,6 +28,13 @@ interface RegisterSummary {
   register: "AKKRED" | "DEPSTAN";
   lastRun: ImportRun | null;
   lastSuccess: ImportRun | null;
+  /**
+   * Most recent run that confirmed the data is current — a completed import
+   * OR a change-detection run that found nothing to do. Freshness is measured
+   * against this, not `lastSuccess`: Depstan legitimately reports NO_CHANGES
+   * most days, which would otherwise read as "never updated".
+   */
+  lastVerified: ImportRun | null;
   active: number;
   disappeared: number;
 }
@@ -68,9 +75,9 @@ function fmtDuration(ms: number | null): string {
 }
 
 /** Flags a register whose data is getting old, so staleness is visible at a glance. */
-function freshness(lastSuccess: ImportRun | null): { text: string; stale: boolean } {
-  if (!lastSuccess) return { text: "never", stale: true };
-  const hours = (Date.now() - new Date(lastSuccess.startedAt).getTime()) / 3_600_000;
+function freshness(lastVerified: ImportRun | null): { text: string; stale: boolean } {
+  if (!lastVerified) return { text: "never", stale: true };
+  const hours = (Date.now() - new Date(lastVerified.startedAt).getTime()) / 3_600_000;
   if (hours < 1) return { text: "under an hour ago", stale: false };
   if (hours < 48) return { text: `${Math.floor(hours)} h ago`, stale: hours > 36 };
   return { text: `${Math.floor(hours / 24)} d ago`, stale: true };
@@ -129,7 +136,7 @@ export default function AdminImportsPage() {
       {/* Per-register health */}
       <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
         {summary.map((s) => {
-          const f = freshness(s.lastSuccess);
+          const f = freshness(s.lastVerified ?? s.lastSuccess);
           return (
             <div key={s.register} className="rounded-lg border border-gray-200 bg-white p-5">
               <div className="flex items-start justify-between gap-3">
@@ -143,7 +150,7 @@ export default function AdminImportsPage() {
                 <dt className="text-gray-500">Gone from source</dt>
                 <dd className="text-right font-medium">{s.disappeared.toLocaleString("ru-RU")}</dd>
 
-                <dt className="text-gray-500">Last successful run</dt>
+                <dt className="text-gray-500">Last verified</dt>
                 <dd
                   className="text-right font-medium"
                   style={{ color: f.stale ? "#B45309" : undefined }}
