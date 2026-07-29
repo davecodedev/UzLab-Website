@@ -219,6 +219,16 @@ model Laboratory {
   scopeText            String? // full scope table as plain text
   directions           String[]            @default([]) // industry sectors covered
 
+  /// Script-neutral search key: every searchable field folded to bare lowercase
+  /// Latin by common/utils/translit.ts, including the full scope text. Lets a
+  /// query typed in Uzbek Latin match a document written in Cyrillic, which no
+  /// Postgres text-search configuration does — there is no Uzbek stemmer, and
+  /// the registers mix scripts inside single documents.
+  ///
+  /// Derived, never displayed. Rebuilt by scripts/rebuild-search-index.ts and
+  /// kept current by the importers.
+  searchText String?
+
   // Source lifecycle. A scheduled re-import refreshes every row it still finds
   // upstream; rows the source has stopped listing keep their data but get
   // stamped `disappearedAt` rather than being deleted, so a bad scrape can

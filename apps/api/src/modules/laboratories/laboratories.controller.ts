@@ -26,6 +26,17 @@ export class LaboratoriesController {
     return this.laboratoriesService.listAllForAdmin();
   }
 
+  /**
+   * Returns the ids matching a keyword search, for the registry's Keywords
+   * filter. Ids only: the client already holds every record, so sending the
+   * matching set back is enough to intersect with the other filters, and it
+   * keeps this response tiny regardless of how many documents matched.
+   */
+  @Get('search/keywords')
+  searchKeywords(@Query('q') q?: string) {
+    return this.laboratoriesService.searchKeywords(q ?? '');
+  }
+
   // --- Member submissions ---------------------------------------------------
   // Declared before the ':slug' route: Nest matches in order, so 'submissions'
   // would otherwise be swallowed as a slug.

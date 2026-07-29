@@ -13,6 +13,7 @@ import { PrismaService } from '../../common/prisma/prisma.service.js';
 import { slugify } from '../../common/utils/slugify.js';
 import { ListLaboratoriesDto } from './dto/list-laboratories.dto.js';
 import { SubmitLaboratoryDto, ReviewSubmissionDto } from './dto/submit-laboratory.dto.js';
+import { foldQueryTerms } from '../../common/utils/translit.js';
 import { CreateLaboratoryDto } from './dto/create-laboratory.dto.js';
 import { UpdateLaboratoryDto } from './dto/update-laboratory.dto.js';
 
@@ -36,13 +37,48 @@ export class LaboratoriesService {
     };
 
     // scopeText holds each body's full scope-of-accreditation table — ~10.5 MB
-    // across the register, with single records over 300 KB. It's only ever
-    // rendered on a detail page, so it stays out of list responses.
+    // across the register, with single records over 300 KB. searchText is the
+    // folded copy of it plus every other searchable field, so it is larger
+    // still. Both are server-side only; the list response would otherwise be
+    // tens of megabytes.
     return this.prisma.laboratory.findMany({
       where,
       orderBy: { name: 'asc' },
-      omit: { scopeText: true },
+      omit: { scopeText: true, searchText: true },
     });
+  }
+
+  /**
+   * Keyword search across every indexed field, including the text of each
+   * laboratory's scope-of-accreditation PDF.
+   *
+   * Runs in the database rather than the browser because the scope text is far
+   * too large to ship to a client. The query is folded through the same
+   * transliteration as the stored key, so a term typed in Uzbek Latin matches a
+   * document written in Cyrillic and vice versa.
+   *
+   * Terms are ANDed: more words narrows the result, which is what a person
+   * expects from a search box.
+   */
+  async searchKeywords(query: string, limit = 500): Promise<string[]> {
+    const terms = foldQueryTerms(query);
+    if (terms.length === 0) return [];
+
+    // Parameterised throughout — these strings come straight from a URL.
+    const conditions = Prisma.join(
+      terms.map((t) => Prisma.sql`"searchText" LIKE ${'%' + t + '%'}`),
+      ' AND ',
+    );
+
+    const rows = await this.prisma.$queryRaw<{ id: string }[]>`
+      SELECT "id" FROM "Laboratory"
+      WHERE "deletedAt" IS NULL
+        AND "isPublished" = true
+        AND "searchText" IS NOT NULL
+        AND (${conditions})
+      LIMIT ${Math.min(limit, 2000)}
+    `;
+    return rows.map((r) => r.id);
   }
 
   // Staff-only: includes unpublished entries, unlike the public list().
