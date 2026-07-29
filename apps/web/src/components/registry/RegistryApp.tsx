@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import { useLang, type Lang } from "@/lib/i18n";
+import { api } from "@/lib/api";
 import {
   BODY_TYPE_OPTIONS,
   EMPTY_FILTERS,
@@ -108,7 +109,17 @@ const UI = {
   scope: { ru: "ОД — область аккредитации", uz: "AD — akkreditatsiya doirasi", en: "RD — field of accreditation" },
   scopePlaceholder: { ru: "напр. пищевая продукция, вода", uz: "masalan, oziq-ovqat, suv", en: "e.g. food products, water" },
   keywords: { ru: "Ключевые слова", uz: "Kalit so'zlar", en: "Keywords" },
-  keywordsPlaceholder: { ru: "название, номер, тип…", uz: "nomi, raqami, turi…", en: "name, number, type…" },
+  keywordsPlaceholder: {
+    ru: "напр. герметичность, молоко, ISO 17025",
+    uz: "masalan, germetiklik, sut, ISO 17025",
+    en: "e.g. tightness, milk, ISO 17025",
+  },
+  keywordsHint: {
+    ru: "Ищет и по тексту областей аккредитации (PDF). Можно писать латиницей или кириллицей — найдётся и то, и другое.",
+    uz: "Akkreditatsiya sohalari matni (PDF) bo'yicha ham qidiradi. Lotin yoki kirill alifbosida yozishingiz mumkin — ikkalasi ham topiladi.",
+    en: "Also searches the text of the scope-of-accreditation PDFs. Type in Latin or Cyrillic — either finds both.",
+  },
+  keywordsSearching: { ru: "Поиск…", uz: "Qidirilmoqda…", en: "Searching…" },
   standardDoc: { ru: "Нормативный документ", uz: "Normativ hujjat", en: "Normative document" },
   standardDocPlaceholder: { ru: "напр. ISO/IEC 17025", uz: "masalan, ISO/IEC 17025", en: "e.g. ISO/IEC 17025" },
   stakeholder: { ru: "Реестр участников", uz: "Ishtirokchilar reyestri", en: "Stakeholder registry" },
@@ -252,7 +263,53 @@ export function RegistryApp({ laboratories }: { laboratories: Laboratory[] }) {
     setFilters(EMPTY_FILTERS);
   }
 
-  const filtered = useMemo(() => laboratories.filter((lab) => matches(lab, filters)), [laboratories, filters]);
+  // Keyword search runs on the server because it reaches into each laboratory's
+  // scope-of-accreditation document, which is far too large to send to the
+  // browser. Everything else still filters instantly on the client.
+  const [keywordIds, setKeywordIds] = useState<ReadonlySet<string> | undefined>(undefined);
+  const [keywordBusy, setKeywordBusy] = useState(false);
+  const keywordSeq = useRef(0);
+
+  useEffect(() => {
+    const q = filters.keywords.trim();
+    if (!q) {
+      // Clearing the box must drop the id restriction, or the previous query's
+      // results would keep narrowing an otherwise empty filter.
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- resets derived state when the query is cleared
+      setKeywordIds(undefined);
+      setKeywordBusy(false);
+      return;
+    }
+
+    // Debounced so a typed word is one request, not one per keystroke.
+    const seq = ++keywordSeq.current;
+    setKeywordBusy(true);
+    const timer = setTimeout(() => {
+      api
+        .get<string[]>(`/laboratories/search/keywords?q=${encodeURIComponent(q)}`)
+        .then((ids) => {
+          // Ignore a slow response that a newer query has already superseded,
+          // otherwise results can flicker back to a stale set.
+          if (seq !== keywordSeq.current) return;
+          setKeywordIds(new Set(ids));
+          setKeywordBusy(false);
+        })
+        .catch(() => {
+          if (seq !== keywordSeq.current) return;
+          // On failure show nothing rather than silently ignoring the term,
+          // which would look like a match against every record.
+          setKeywordIds(new Set());
+          setKeywordBusy(false);
+        });
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [filters.keywords]);
+
+  const filtered = useMemo(
+    () => laboratories.filter((lab) => matches(lab, filters, keywordIds)),
+    [laboratories, filters, keywordIds],
+  );
 
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -420,7 +477,14 @@ export function RegistryApp({ laboratories }: { laboratories: Laboratory[] }) {
       <div className="mt-8 flex flex-col gap-6 lg:flex-row lg:items-start">
         {/* Sidebar ------------------------------------------------------- */}
         <div className="reg-print-hide w-full flex-none space-y-4 lg:sticky lg:top-6 lg:w-[300px]">
-          <FiltersCard lang={lang} filters={filters} updateFilter={updateFilter} clearAll={clearAll} onSearch={handleSearchClick} />
+          <FiltersCard
+            lang={lang}
+            filters={filters}
+            updateFilter={updateFilter}
+            clearAll={clearAll}
+            onSearch={handleSearchClick}
+            keywordBusy={keywordBusy}
+          />
           {recentSearches.length > 0 && (
             <RecentSearchesCard
               lang={lang}
@@ -546,12 +610,15 @@ function FiltersCard({
   updateFilter,
   clearAll,
   onSearch,
+  keywordBusy,
 }: {
   lang: Lang;
   filters: RegistryFilters;
   updateFilter: <K extends keyof RegistryFilters>(key: K, value: RegistryFilters[K]) => void;
   clearAll: () => void;
   onSearch: () => void;
+  /** True while the server-side keyword lookup is in flight. */
+  keywordBusy: boolean;
 }) {
   const active = hasActiveFilters(filters);
   return (
@@ -705,6 +772,11 @@ function FiltersCard({
         <div>
           <label className={labelClass()} style={{ color: "var(--reg-gray-2)" }}>
             {t("keywords", lang)}
+            {keywordBusy && (
+              <span className="ml-2 font-normal normal-case" style={{ color: "var(--reg-blue)" }}>
+                {t("keywordsSearching", lang)}
+              </span>
+            )}
           </label>
           <input
             value={filters.keywords}
@@ -713,6 +785,9 @@ function FiltersCard({
             className={inputClass()}
             style={{ border: "1px solid var(--reg-border)" }}
           />
+          <p className="mt-1.5 text-[11.5px] leading-snug" style={{ color: "var(--reg-gray-3)" }}>
+            {t("keywordsHint", lang)}
+          </p>
         </div>
 
         <div>
@@ -836,7 +911,14 @@ function SavedViewsBar({
         {t("myLabs", lang)}
       </span>
       {savedViews.map((v) => {
-        const count = dataset.filter((lab) => matches(lab, v.filters)).length;
+        // A saved view containing a keyword cannot be counted here: keyword
+        // matching lives on the server. Showing a client-side count would
+        // silently ignore the keyword and overstate the total, so the badge is
+        // omitted for those rather than made up.
+        const countable = !v.filters.keywords?.trim();
+        const count = countable
+          ? dataset.filter((lab) => matches(lab, v.filters)).length
+          : null;
         return (
           <span
             key={v.id}
@@ -846,12 +928,14 @@ function SavedViewsBar({
             <button type="button" onClick={() => onApply(v)} className="reg-btn">
               {v.name}
             </button>
-            <span
-              className="reg-mono rounded-full px-1.5 py-0.5 text-[10px] font-bold text-white"
-              style={{ background: "var(--reg-blue)" }}
-            >
-              {count}
-            </span>
+            {count !== null && (
+              <span
+                className="reg-mono rounded-full px-1.5 py-0.5 text-[10px] font-bold text-white"
+                style={{ background: "var(--reg-blue)" }}
+              >
+                {count}
+              </span>
+            )}
             <button
               type="button"
               onClick={() => onRemove(v.id)}

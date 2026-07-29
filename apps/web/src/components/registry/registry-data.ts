@@ -419,7 +419,16 @@ function includesCI(haystack: string | null | undefined, needle: string): boolea
   return (haystack ?? "").toLowerCase().includes(needle.toLowerCase());
 }
 
-export function matches(lab: Laboratory, f: RegistryFilters): boolean {
+/**
+ * @param keywordIds Ids returned by the server for the current keyword query,
+ *   or undefined when no keyword search is active. Passing an empty set
+ *   correctly matches nothing.
+ */
+export function matches(
+  lab: Laboratory,
+  f: RegistryFilters,
+  keywordIds?: ReadonlySet<string>,
+): boolean {
   if (f.labsOnly && !lab.isLaboratory) return false;
   if (f.regNo && !includesCI(lab.accreditationNumber, f.regNo)) return false;
   if (f.orgName && !(includesCI(lab.name, f.orgName) || includesCI(lab.legalEntityName, f.orgName))) {
@@ -445,17 +454,10 @@ export function matches(lab: Laboratory, f: RegistryFilters): boolean {
     const hay = [...lab.directions, lab.bodyTypeLabel ?? ""].join(" ");
     if (!includesCI(hay, f.scope)) return false;
   }
-  if (f.keywords) {
-    const hay = [
-      lab.name,
-      lab.legalEntityName ?? "",
-      lab.accreditationNumber ?? "",
-      lab.taxId ?? "",
-      lab.standard ?? "",
-      lab.directions.join(" "),
-    ].join(" ");
-    if (!includesCI(hay, f.keywords)) return false;
-  }
+  // `keywords` is deliberately absent here. It now searches the text of each
+  // laboratory's scope-of-accreditation PDF, which is far too large to ship to
+  // the browser, so it is resolved server-side and applied as `keywordIds`.
+  if (keywordIds && !keywordIds.has(lab.id)) return false;
   if (f.standardDoc && !includesCI(lab.standard, f.standardDoc)) return false;
   if (f.taxId && !includesCI(lab.taxId, f.taxId)) return false;
   if (f.stakeholder) {
