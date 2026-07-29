@@ -219,8 +219,13 @@ function parseDetailPage(html: string): Detail {
       out[key] = lines[i + 1];
     }
   }
-  out.certificateUrl = html.match(/href="([^"]*download-certificate\/\d+)"/)?.[1];
-  out.scopeUrl = html.match(/href="([^"]*download_pdf\/[a-z0-9]+)"/i)?.[1];
+  // The route names are the reverse of what they serve, verified by extracting
+  // the text of both on several records: /download_pdf/ returns the approval
+  // certificate ("MA'QULLASH TO'G'RISIDA GUVOHNOMA") while
+  // /download-certificate/ returns the scope ("MA'QULLASH SOHASI"). Map by what
+  // the file actually is, not by what the URL is called.
+  out.certificateUrl = html.match(/href="([^"]*download_pdf\/[a-z0-9]+)"/i)?.[1];
+  out.scopeUrl = html.match(/href="([^"]*download-certificate\/\d+)"/)?.[1];
   return out;
 }
 
