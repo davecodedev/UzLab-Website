@@ -94,9 +94,17 @@ export class LaboratoryDocumentsService {
    */
   private guessKind(text: string): LaboratoryDocumentKind {
     const head = text.slice(0, 600).toUpperCase();
-    const scope = /SOHASI|СОҲАСИ|ОБЛАСТ[ЬИ] АККРЕДИТАЦИИ/.test(head);
-    const annex = /ILOVA|ИЛОВА|ПРИЛОЖЕНИЕ/.test(head);
-    if (scope || annex) return LaboratoryDocumentKind.SCOPE;
+
+    // Check the certificate heading FIRST. Both documents mention "sohasi"
+    // (scope) in their body — a certificate states what it covers — so testing
+    // for that word first classifies certificates as scopes. Only the phrase
+    // "TO'G'RISIDA GUVOHNOMA" ("certificate of…") is unique to the certificate.
+    if (/TO['`’ʻ]?G['`’ʻ]?RISIDA\s+GUVOHNOMA|ТЎҒРИСИДА\s+ГУВОҲНОМА|СЕРТИФИКАТ\s+АККРЕДИТАЦИИ/.test(head)) {
+      return LaboratoryDocumentKind.CERTIFICATE;
+    }
+    if (/SOHASI|СОҲАСИ|ОБЛАСТ[ЬИ]\s+АККРЕДИТАЦИИ|ILOVA|ИЛОВА|ПРИЛОЖЕНИЕ/.test(head)) {
+      return LaboratoryDocumentKind.SCOPE;
+    }
     return LaboratoryDocumentKind.CERTIFICATE;
   }
 
