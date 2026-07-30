@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useLang, pick } from "@/lib/i18n";
-import { formatNewsDate, type NewsArticle as NewsListItem } from "@/components/NewsListView";
+import type { NewsArticle as NewsListItem } from "@/components/NewsListView";
+import { formatDateLong } from "@/lib/format";
 
 export interface NewsArticleDetail {
   id: string;
@@ -30,7 +31,7 @@ export function NewsArticleView({
   const { lang } = useLang();
   const t = <K extends keyof typeof UI>(key: K) => pick(UI[key], lang);
 
-  const date = formatNewsDate(article.publishedAt, lang);
+  const date = formatDateLong(article.publishedAt, lang);
 
   return (
     <div>
@@ -92,7 +93,7 @@ export function NewsArticleView({
               </div>
               <div className="flex flex-col gap-4">
                 {otherNews.map((item) => {
-                  const itemDate = formatNewsDate(item.publishedAt, lang);
+                  const itemDate = formatDateLong(item.publishedAt, lang);
                   return (
                     <Link
                       key={item.id}

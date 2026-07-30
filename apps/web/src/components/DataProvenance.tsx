@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { useLang, pick, type Lang } from "@/lib/i18n";
 import { PROVENANCE_PATH, REGISTER_SITES, type ProvenanceSource } from "@/lib/provenance";
+import { formatDateTime, formatNumber, formatRelative } from "@/lib/format";
 
 // Where the registry's data comes from, how current it is, and where to read
 // the authoritative version.
@@ -13,8 +14,6 @@ import { PROVENANCE_PATH, REGISTER_SITES, type ProvenanceSource } from "@/lib/pr
 // API gives it: never a guessed date, never a rounded-up count, and a register
 // that has never been confirmed says so instead of showing a plausible time.
 
-
-const LOCALES: Record<Lang, string> = { ru: "ru-RU", uz: "uz-UZ", en: "en-GB" };
 
 /**
  * Beyond this, the copy is old enough that a visitor should be told before
@@ -46,7 +45,6 @@ const T = {
     uz: "hali solishtirilmagan",
     en: "never checked",
   },
-  justNow: { ru: "только что", uz: "hozirgina", en: "just now" },
   stale: {
     ru: "Давно не сверялось",
     uz: "Uzoq vaqt solishtirilmagan",
@@ -97,109 +95,13 @@ const REFRESH_LABELS: Record<string, Record<Lang, string>> = {
 };
 
 /**
- * Uzbek is formatted by hand rather than by Intl.
- *
- * Browsers commonly ship no Latin-script Uzbek locale data — only uz-Cyrl — so
- * "uz-UZ" silently falls back to the root locale and produces "2026 M07 30
- * 11:31" and "-2 h" instead of a readable date and phrase. Node does carry the
- * data, so leaving it to Intl would also make the server-rendered text differ
- * from what the browser produces on hydration. Both problems disappear once the
- * wording is ours. Uzbek numerals take no plural agreement, so the templates
- * below need no special-casing.
+ * How old the copy is, for the staleness mark. Separate from the wording: this
+ * is the number the UI decides on, not the phrase it shows.
  */
-const UZ_MONTHS = [
-  "yan",
-  "fev",
-  "mar",
-  "apr",
-  "may",
-  "iyn",
-  "iyl",
-  "avg",
-  "sen",
-  "okt",
-  "noy",
-  "dek",
-];
-
-/**
- * Date and time in Tashkent, as digits.
- *
- * Pinned to Tashkent on purpose: the registers, their publishers and almost
- * every reader are there, Uzbekistan keeps UTC+5 all year, and a fixed zone
- * makes the server-rendered string identical to the hydrated one. Read through
- * en-GB, whose data every runtime has, because only the numbers are taken.
- */
-function tashkentParts(date: Date) {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Tashkent",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(date);
-  const value = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
-  return {
-    year: value("year"),
-    month: Number(value("month")),
-    day: Number(value("day")),
-    hour: value("hour"),
-    minute: value("minute"),
-  };
-}
-
-/**
- * The absolute timestamp, so a printout or a screenshot still carries a date.
- * The offset is spelled out so a reader outside Uzbekistan is not misled.
- */
-function absolute(iso: string, lang: Lang): string | null {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return null;
-
-  if (lang === "uz") {
-    const p = tashkentParts(date);
-    return `${p.day}-${UZ_MONTHS[p.month - 1]} ${p.year}, ${p.hour}:${p.minute} (UTC+5)`;
-  }
-
-  const text = date.toLocaleString(LOCALES[lang], {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "Asia/Tashkent",
-  });
-  return `${text} (UTC+5)`;
-}
-
 function hoursSince(iso: string, now: number): number | null {
   const time = new Date(iso).getTime();
   if (Number.isNaN(time)) return null;
   return (now - time) / 3_600_000;
-}
-
-/** "2 hours ago" — useless on paper, but the fastest read on screen. */
-function relative(iso: string, now: number, lang: Lang): string | null {
-  const hours = hoursSince(iso, now);
-  if (hours === null) return null;
-  const minutes = Math.round(hours * 60);
-  if (minutes < 1) return pick(T.justNow, lang);
-
-  if (lang === "uz") {
-    if (minutes < 60) return `${minutes} daqiqa oldin`;
-    if (hours < 48) return `${Math.floor(hours)} soat oldin`;
-    return `${Math.floor(hours / 24)} kun oldin`;
-  }
-
-  const rtf = new Intl.RelativeTimeFormat(LOCALES[lang], { numeric: "auto" });
-  if (minutes < 60) return rtf.format(-minutes, "minute");
-  if (hours < 48) return rtf.format(-Math.floor(hours), "hour");
-  return rtf.format(-Math.floor(hours / 24), "day");
-}
-
-/** Thousands separator: a space in Uzbek, whatever Intl says elsewhere. */
-function count(records: number, lang: Lang): string {
-  if (lang === "uz") return String(records).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-  return records.toLocaleString(LOCALES[lang]);
 }
 
 /**
@@ -236,7 +138,7 @@ function StaleMark({ lang }: { lang: Lang }) {
  * and says so — no stand-in date.
  */
 function Verified({ iso, lang, now }: { iso: string | null; lang: Lang; now: number | null }) {
-  const abs = iso ? absolute(iso, lang) : null;
+  const abs = iso ? formatDateTime(iso, lang) : null;
 
   if (!iso || !abs) {
     return (
@@ -249,7 +151,7 @@ function Verified({ iso, lang, now }: { iso: string | null; lang: Lang; now: num
 
   const hours = now === null ? null : hoursSince(iso, now);
   const stale = hours !== null && hours > STALE_AFTER_HOURS;
-  const rel = now === null ? null : relative(iso, now, lang);
+  const rel = now === null ? null : formatRelative(iso, now, lang);
 
   return (
     <span style={{ color: "var(--uz-text)" }}>
@@ -366,7 +268,7 @@ export function DataProvenance({ sources: initial }: { sources: ProvenanceSource
                   <div className="flex flex-wrap gap-x-2">
                     <dt style={{ color: "var(--uz-text-faint)" }}>{pick(T.records, lang)}:</dt>
                     <dd className="font-semibold" style={{ color: "var(--uz-text)" }}>
-                      {count(s.records, lang)}
+                      {formatNumber(s.records, lang)}
                     </dd>
                   </div>
                   <div className="flex flex-wrap gap-x-2">
@@ -435,7 +337,7 @@ export function RecordProvenance({
     };
   }, [register]);
 
-  const lastSeenAbs = lastSeenAt ? absolute(lastSeenAt, lang) : null;
+  const lastSeenAbs = lastSeenAt ? formatDateTime(lastSeenAt, lang) : null;
 
   // Nothing confirmed yet and nothing to show: stay silent rather than put up
   // an empty heading that implies more than we know.

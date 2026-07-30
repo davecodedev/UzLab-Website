@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { useLang, pick, type Lang } from "@/lib/i18n";
 import { apiUrl } from "@/lib/api";
+import { formatDateNumeric, formatNumber } from "@/lib/format";
 import { LaboratoryClaimForm } from "@/components/LaboratoryClaimForm";
 import { RecordProvenance } from "@/components/DataProvenance";
 import type { LaboratoryProfile } from "@/lib/claims";
@@ -345,16 +346,14 @@ const FIELD_LABELS: Record<string, L10n> = {
   OTHER: { ru: "Прочее", uz: "Boshqa", en: "Other" },
 };
 
-const LOCALES: Record<Lang, string> = { ru: "ru-RU", uz: "uz-UZ", en: "en-GB" };
-
 // scopeText holds a body's entire scope-of-accreditation table and reaches
 // ~300 000 characters on a single record. Only the first slice is rendered;
 // the complete document is the PDF at `scopeUrl`.
 const SCOPE_CHAR_LIMIT = 20_000;
 
 function scopeTruncationNote(shown: number, total: number, lang: Lang): string {
-  const s = shown.toLocaleString(LOCALES[lang]);
-  const n = total.toLocaleString(LOCALES[lang]);
+  const s = formatNumber(shown, lang);
+  const n = formatNumber(total, lang);
   switch (lang) {
     case "ru":
       return `Показаны первые ${s} символов из ${n} — текст сокращён.`;
@@ -363,13 +362,6 @@ function scopeTruncationNote(shown: number, total: number, lang: Lang): string {
     case "en":
       return `Showing the first ${s} of ${n} characters — the text is truncated.`;
   }
-}
-
-function formatDate(value: string | null, lang: Lang): string | null {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleDateString(LOCALES[lang]);
 }
 
 function externalHref(url: string): string {
@@ -443,10 +435,10 @@ export function LaboratoryDetailView({ lab }: { lab: Laboratory }) {
     ...row(t("bodyType"), bodyType),
     // Raw register wording — rendered verbatim, never translated.
     ...row(t("bodyTypeRegister"), lab.bodyTypeLabel),
-    ...row(t("accreditationDate"), formatDate(lab.accreditationDate, lang)),
-    ...row(t("reAccreditationDate"), formatDate(lab.reAccreditationDate, lang)),
-    ...row(t("accreditedUntil"), formatDate(lab.accreditedUntil, lang)),
-    ...row(t("statusDate"), formatDate(lab.statusDate, lang)),
+    ...row(t("accreditationDate"), formatDateNumeric(lab.accreditationDate, lang)),
+    ...row(t("reAccreditationDate"), formatDateNumeric(lab.reAccreditationDate, lang)),
+    ...row(t("accreditedUntil"), formatDateNumeric(lab.accreditedUntil, lang)),
+    ...row(t("statusDate"), formatDateNumeric(lab.statusDate, lang)),
     // The register's own status wording, before mapping to our enum —
     // rendered verbatim, never translated.
     ...row(t("registerStatus"), lab.registerStatusLabel),

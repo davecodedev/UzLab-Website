@@ -1,6 +1,7 @@
 "use client";
 
 import { useLang, pick, type Lang } from "@/lib/i18n";
+import { formatCurrency } from "@/lib/format";
 import { MembershipCta } from "@/components/MembershipCta";
 
 export interface MembershipType {
@@ -59,20 +60,8 @@ const UI = {
   durDays: { ru: "дн.", uz: "kun", en: "days" },
 };
 
-const LOCALES: Record<Lang, string> = { ru: "ru-RU", uz: "uz-UZ", en: "en-GB" };
-
 function formatPrice(cents: number, currency: string, lang: Lang) {
-  const amount = cents / 100;
-  try {
-    return new Intl.NumberFormat(LOCALES[lang], {
-      style: "currency",
-      currency,
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  } catch {
-    return `${amount.toLocaleString()} ${currency}`;
-  }
+  return formatCurrency(cents / 100, currency, lang);
 }
 
 function formatDuration(days: number, lang: Lang) {

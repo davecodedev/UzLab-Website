@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useLang, pick, type Lang } from "@/lib/i18n";
+import { useLang, pick } from "@/lib/i18n";
+import { formatDateLong } from "@/lib/format";
 
 export interface NewsArticle {
   id: string;
@@ -22,15 +23,6 @@ const UI = {
     en: "No news has been published yet.",
   },
 };
-
-const LOCALES: Record<Lang, string> = { ru: "ru-RU", uz: "uz-UZ", en: "en-GB" };
-
-export function formatNewsDate(value: string | null, lang: Lang): string | null {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleDateString(LOCALES[lang], { day: "numeric", month: "long", year: "numeric" });
-}
 
 function Kicker({ children }: { children: React.ReactNode }) {
   return (
@@ -80,7 +72,7 @@ export function NewsListView({ news }: { news: NewsArticle[] }) {
         ) : (
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {news.map((article) => {
-              const date = formatNewsDate(article.publishedAt, lang);
+              const date = formatDateLong(article.publishedAt, lang);
               return (
                 <Link
                   key={article.id}

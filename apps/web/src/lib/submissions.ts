@@ -10,6 +10,7 @@
 // member entries invisible to that filter.
 
 import type { Lang } from "@/lib/i18n";
+import { formatDecimal } from "@/lib/format";
 
 /**
  * Exactly the keys `SubmitLaboratoryDto` whitelists, and nothing else.
@@ -117,7 +118,7 @@ const SIZE_UNITS: Record<Lang, { kb: string; mb: string }> = {
 export function formatFileSize(bytes: number, lang: Lang): string {
   const units = SIZE_UNITS[lang];
   const mb = bytes / 1024 / 1024;
-  if (mb >= 1) return `${mb.toFixed(1)} ${units.mb}`;
+  if (mb >= 1) return `${formatDecimal(mb, lang)} ${units.mb}`;
   return `${Math.max(1, Math.round(bytes / 1024))} ${units.kb}`;
 }
 

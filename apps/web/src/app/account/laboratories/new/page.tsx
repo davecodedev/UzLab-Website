@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, ApiError, uploadFile } from "@/lib/api";
 import { getAccessToken } from "@/lib/auth-client";
-import { useLang, pick, type Lang } from "@/lib/i18n";
+import { useLang, pick } from "@/lib/i18n";
+import { formatNumber } from "@/lib/format";
 import {
   BODY_TYPE_OPTIONS,
   REGION_OPTIONS,
@@ -343,8 +344,6 @@ const textareaClass =
   "mt-1.5 w-full rounded-md px-3.5 py-2.5 text-sm leading-relaxed outline-none transition-colors focus:border-[var(--uz-blue-500)]";
 const inputStyle = { border: "1px solid var(--uz-border-strong)", color: "var(--uz-ink)" };
 const labelClass = "block text-sm font-bold";
-
-const NUMBER_LOCALES: Record<Lang, string> = { ru: "ru-RU", uz: "uz-UZ", en: "en-GB" };
 
 /** Optional fields are omitted, not sent empty — an empty `email` fails `@IsEmail`. */
 function trimmed(value: string): string | undefined {
@@ -994,7 +993,7 @@ export default function NewLaboratoryPage() {
               <div className="min-w-0">
                 <dt style={{ color: "var(--uz-text-faint)" }}>{t("docCharacters")}</dt>
                 <dd className="mt-0.5 font-medium" style={{ color: "var(--uz-text)" }}>
-                  {analysis.characters.toLocaleString(NUMBER_LOCALES[lang])}
+                  {formatNumber(analysis.characters, lang)}
                 </dd>
               </div>
             </dl>
