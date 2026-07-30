@@ -4,7 +4,7 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { api, ApiError } from "@/lib/api";
-import { storeSession } from "@/lib/auth-client";
+import { isStaff, storeSession } from "@/lib/auth-client";
 import { AuthShell, AuthInput } from "@/components/AuthShell";
 import { useLang, pick } from "@/lib/i18n";
 
@@ -46,7 +46,12 @@ function LoginForm() {
     try {
       const result = await api.post<AuthResponse>("/auth/login", { email, password });
       storeSession(result.accessToken, result.refreshToken, result.user);
-      router.push(params.get("next") ?? "/");
+
+      // Staff land in the admin panel rather than on the marketing page: it is
+      // the only reason they signed in. An explicit `next` still wins, so a
+      // deep link into a specific page is not hijacked.
+      const next = params.get("next");
+      router.push(next ?? (isStaff(result.user) ? "/admin" : "/"));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Login failed.");
     }

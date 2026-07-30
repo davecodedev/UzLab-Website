@@ -52,6 +52,50 @@ export class ImportsService {
     );
   }
 
+  /**
+   * Public provenance: which official register each part of the data comes
+   * from, when we last confirmed it against that source, and where to read the
+   * authoritative version.
+   *
+   * Deliberately open to everyone. A registry that republishes government data
+   * owes its readers a way to tell how current it is and to check it at source
+   * — otherwise a stale copy looks exactly like a fresh one.
+   */
+  async publicProvenance() {
+    const sources = [
+      {
+        register: NationalRegister.AKKRED,
+        name: "O'zbekiston akkreditatsiya markazi (O'zAkk)",
+        url: 'https://akkred.uz/uz/reestr',
+        refresh: 'hourly',
+      },
+      {
+        register: NationalRegister.DEPSTAN,
+        name: "O'zbekiston texnik jihatdan tartibga solish agentligi (Depstan)",
+        url: 'https://approval.depstan.uz/',
+        refresh: 'daily',
+      },
+    ];
+
+    return Promise.all(
+      sources.map(async (s) => {
+        // A run that found nothing to change still confirms the data is
+        // current, so both outcomes count as a verification.
+        const [verified, records] = await Promise.all([
+          this.prisma.importRun.findFirst({
+            where: { register: s.register, status: { in: ['SUCCESS', 'NO_CHANGES'] } },
+            orderBy: { startedAt: 'desc' },
+            select: { startedAt: true },
+          }),
+          this.prisma.laboratory.count({
+            where: { register: s.register, disappearedAt: null, deletedAt: null, isPublished: true },
+          }),
+        ]);
+        return { ...s, records, lastVerifiedAt: verified?.startedAt ?? null };
+      }),
+    );
+  }
+
   /** Records the source has stopped listing — kept, not deleted. */
   listDisappeared(limit = 100) {
     return this.prisma.laboratory.findMany({

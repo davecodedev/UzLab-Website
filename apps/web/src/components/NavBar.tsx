@@ -128,17 +128,14 @@ export function NavBar() {
 
         {user ? (
           <div className="hidden items-center gap-3 lg:flex">
-            {isStaff(user) && (
-              <Link href="/admin" className="text-sm" style={{ color: "var(--uz-text)" }}>
-                Admin
-              </Link>
-            )}
             <span className="text-sm" style={{ color: "var(--uz-text-muted)" }}>
               {user.fullName}
             </span>
-            {/* Signed in, the account button leads to the member area rather than to /login. */}
+            {/* Signed in, this leads where the person actually works: staff to
+                the admin panel, members to their own area. The separate "Admin"
+                link is gone — it duplicated this for staff. */}
             <Link
-              href="/account"
+              href={isStaff(user) ? "/admin" : "/account"}
               className="flex flex-none items-center rounded-md px-[18px] text-sm font-semibold"
               style={{
                 height: 38,
@@ -194,16 +191,12 @@ export function NavBar() {
           <div className="mt-4 pt-4" style={{ borderTop: "1px solid var(--uz-border)" }}>
             {user ? (
               <div className="flex flex-col gap-3">
-                {isStaff(user) && (
-                  <Link href="/admin" className="text-sm" style={{ color: "var(--uz-text)" }}>
-                    Admin
-                  </Link>
-                )}
+
                 <span className="text-sm" style={{ color: "var(--uz-text-muted)" }}>
                   {user.fullName}
                 </span>
                 <Link
-                  href="/account"
+                  href={isStaff(user) ? "/admin" : "/account"}
                   className="w-fit rounded-md px-4 py-1.5 text-sm font-semibold"
                   style={{
                     border: "1px solid var(--uz-border-strong)",
