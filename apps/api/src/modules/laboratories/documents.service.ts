@@ -117,14 +117,38 @@ export class LaboratoryDocumentsService {
     const email = head.match(/[\w.\-]+@[\w.\-]+\.\w{2,}/);
     if (email) out.email = email[0];
 
-    const phone = head.match(/\+?\(?\d{2,4}\)?[\s\-]?\d{2,3}[\s\-]?\d{2}[\s\-]?\d{2}[\s\-]?\d{0,2}/);
-    if (phone && /\d{7,}/.test(phone[0].replace(/\D/g, ''))) out.phone = phone[0].trim();
+    // Must look unmistakably like a phone number. A loose digit-group pattern
+    // matched "3900-2022" out of the standard designation "O'z DSt 3900-2022"
+    // and offered it as the laboratory's phone — a wrong prefill is worse than
+    // none, because the submitter may not notice it.
+    const phone = head.match(/(?:\+998|\(\s*\d{2,4}\s*\))[\s\-]?\d[\d\s\-]{5,12}\d/);
+    if (phone) out.phone = phone[0].replace(/\s+/g, ' ').trim();
 
-    for (const [key, re] of [
-      ['region', /(Toshkent shahri|Toshkent viloyati|Andijon|Farg['`’]?ona|Namangan|Sirdaryo|Samarqand|Qashqadaryo|Jizzax|Surxondaryo|Buxoro|Navoiy|Xorazm|Qoraqalpog['`’]?iston)/i],
-    ] as const) {
-      const m = head.match(re);
-      if (m) out[key] = m[1];
+    // Regions must come back as the exact stored value, or the form's select
+    // silently falls back to "not selected" and the entry loses its region.
+    const REGIONS: [RegExp, string][] = [
+      [/Toshkent\s+shahri/i, 'Toshkent shahri'],
+      [/Toshkent\s+viloyati/i, 'Toshkent viloyati'],
+      [/Andijon/i, 'Andijon viloyati'],
+      [/Farg['`’]?ona/i, "Farg'ona viloyati"],
+      [/Namangan/i, 'Namangan viloyati'],
+      [/Sirdaryo/i, 'Sirdaryo viloyati'],
+      [/Samarqand/i, 'Samarqand viloyati'],
+      [/Qashqadaryo/i, 'Qashqadaryo viloyati'],
+      [/Jizzax/i, 'Jizzax viloyati'],
+      [/Surxondaryo/i, 'Surxondaryo viloyati'],
+      [/Buxoro/i, 'Buxoro viloyati'],
+      [/Navoiy/i, 'Navoiy viloyati'],
+      [/Xorazm/i, 'Xorazm viloyati'],
+      [/Qoraqalpog['`’]?iston/i, "Qoraqalpog'iston Respublikasi"],
+    ];
+    // "Toshkent shahri" must win over a bare "Toshkent" elsewhere in the text,
+    // so the most specific patterns are listed first and the first hit wins.
+    for (const [re, value] of REGIONS) {
+      if (re.test(head)) {
+        out.region = value;
+        break;
+      }
     }
     return out;
   }
