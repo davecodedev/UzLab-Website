@@ -18,13 +18,14 @@ async function getLaboratories(): Promise<Laboratory[]> {
   }
 }
 
-// Where the records come from and when each register was last confirmed. An
-// empty list renders nothing: better to say nothing than to imply freshness we
-// cannot currently vouch for.
+// Where the records come from and when each register was last confirmed. On
+// failure the block retries from the browser and, if that fails too, says so —
+// but the reason only exists here, so log it rather than swallowing it.
 async function getProvenance(): Promise<ProvenanceSource[]> {
   try {
     return await api.get<ProvenanceSource[]>(PROVENANCE_PATH);
-  } catch {
+  } catch (err) {
+    console.error("[provenance] server fetch failed:", err);
     return [];
   }
 }
