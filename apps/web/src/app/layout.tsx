@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
-import { NavBar } from "@/components/NavBar";
-import { Footer } from "@/components/Footer";
-import { TestSiteBanner } from "@/components/TestSiteBanner";
+import { PublicChrome } from "@/components/PublicChrome";
 import { LangProvider } from "@/lib/i18n";
 import "./globals.css";
 
@@ -27,10 +25,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col">
         <LangProvider>
-          <TestSiteBanner />
-          <NavBar />
-          <main className="flex-1">{children}</main>
-          <Footer />
+          <PublicChrome>{children}</PublicChrome>
         </LangProvider>
       </body>
     </html>
