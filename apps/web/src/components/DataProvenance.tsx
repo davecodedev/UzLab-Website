@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { useLang, pick, type Lang } from "@/lib/i18n";
+import { PROVENANCE_PATH, REGISTER_SITES, type ProvenanceSource } from "@/lib/provenance";
 
 // Where the registry's data comes from, how current it is, and where to read
 // the authoritative version.
@@ -12,37 +13,6 @@ import { useLang, pick, type Lang } from "@/lib/i18n";
 // API gives it: never a guessed date, never a rounded-up count, and a register
 // that has never been confirmed says so instead of showing a plausible time.
 
-/** GET /imports/provenance — public, no authentication. */
-export const PROVENANCE_PATH = "/imports/provenance";
-
-export interface ProvenanceSource {
-  /** NationalRegister — "AKKRED" or "DEPSTAN". */
-  register: string;
-  /** The issuing body, as it names itself. Rendered verbatim, never translated. */
-  name: string;
-  /** The official register's public address — the authoritative version. */
-  url: string;
-  /** How often we re-check the source: "hourly" or "daily". */
-  refresh: string;
-  /** Published, currently-listed records imported from this register. */
-  records: number;
-  /**
-   * When an import run last confirmed this register against its source — a run
-   * that found no changes still confirms the data. Null means it has never been
-   * confirmed, which the UI states plainly rather than hiding.
-   */
-  lastVerifiedAt: string | null;
-}
-
-/**
- * The two registers' stable public entry points, for chrome that is on every
- * page and cannot fetch (the footer). Anything time-sensitive — record counts,
- * verification dates — comes from the API instead, never from here.
- */
-export const REGISTER_SITES = [
-  { name: "O'zAkk", url: "https://akkred.uz/uz/reestr" },
-  { name: "Depstan", url: "https://approval.depstan.uz/" },
-] as const;
 
 const LOCALES: Record<Lang, string> = { ru: "ru-RU", uz: "uz-UZ", en: "en-GB" };
 

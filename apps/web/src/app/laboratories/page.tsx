@@ -1,10 +1,7 @@
 import { RegistryApp } from "@/components/registry/RegistryApp";
 import { AddLaboratoryPrompt } from "@/components/registry/AddLaboratoryPrompt";
-import {
-  DataProvenance,
-  PROVENANCE_PATH,
-  type ProvenanceSource,
-} from "@/components/DataProvenance";
+import { DataProvenance } from "@/components/DataProvenance";
+import { PROVENANCE_PATH, type ProvenanceSource } from "@/lib/provenance";
 import type { Laboratory } from "@/components/registry/registry-data";
 import { api } from "@/lib/api";
 

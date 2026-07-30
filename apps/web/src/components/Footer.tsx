@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useLang, pick } from "@/lib/i18n";
-import { REGISTER_SITES } from "@/components/DataProvenance";
+import { REGISTER_SITES } from "@/lib/provenance";
 
 const FOOTER_DICT = {
   about: { ru: "О нас", uz: "Biz haqimizda", en: "About" },
