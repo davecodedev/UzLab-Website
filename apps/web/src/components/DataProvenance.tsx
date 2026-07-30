@@ -309,11 +309,58 @@ function OfficialLink({ url, label }: { url: string; label: string }) {
  * how often we re-check it, when that last happened and where to read the
  * authoritative version.
  */
-export function DataProvenance({ sources }: { sources: ProvenanceSource[] }) {
+export function DataProvenance({ sources: initial }: { sources: ProvenanceSource[] }) {
   const { lang } = useLang();
   const now = useNow();
 
-  if (sources.length === 0) return null;
+  // Fetched again in the browser when the server render came back empty.
+  // The server-rendered page was silently shipping nothing whenever that fetch
+  // failed, which defeats the point of the block: a page with no provenance
+  // looks exactly like one whose data was never checked.
+  const [fetched, setFetched] = useState<ProvenanceSource[] | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    if (initial.length > 0) return;
+    let cancelled = false;
+    api
+      .get<ProvenanceSource[]>(PROVENANCE_PATH)
+      .then((rows) => !cancelled && setFetched(rows))
+      .catch(() => !cancelled && setFailed(true));
+    return () => {
+      cancelled = true;
+    };
+  }, [initial.length]);
+
+  const sources = initial.length > 0 ? initial : (fetched ?? []);
+
+  // Still loading: show nothing rather than flashing a failure notice.
+  if (sources.length === 0 && !failed) return null;
+
+  if (sources.length === 0) {
+    return (
+      <section className="mx-auto max-w-[1440px] px-6 pb-14 md:px-8">
+        <p
+          className="rounded-xl px-5 py-4 text-sm leading-relaxed"
+          style={{
+            background: "var(--uz-warning-bg)",
+            border: "1px solid var(--uz-warning-border)",
+            color: "var(--uz-warning-foreground)",
+          }}
+        >
+          {pick(T.unavailable, lang)}{" "}
+          {REGISTER_SITES.map((site, i) => (
+            <span key={site.url}>
+              {i > 0 && " · "}
+              <a href={site.url} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+                {site.name} ↗
+              </a>
+            </span>
+          ))}
+        </p>
+      </section>
+    );
+  }
 
   return (
     <section className="mx-auto max-w-[1440px] px-6 pb-14 md:px-8">
