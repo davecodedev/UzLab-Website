@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useLang, pick, type Lang } from "@/lib/i18n";
 import { apiUrl } from "@/lib/api";
 import { LaboratoryClaimForm } from "@/components/LaboratoryClaimForm";
+import { RecordProvenance } from "@/components/DataProvenance";
 import type { LaboratoryProfile } from "@/lib/claims";
 import {
   formatFileSize,
@@ -43,6 +44,12 @@ export interface Laboratory {
   source: string;
 
   register: string | null;
+  /**
+   * When this particular record was last found in its register. More precise
+   * than the register-wide verification time: a run can confirm the register as
+   * a whole while this entry has not been listed for a while.
+   */
+  lastSeenAt: string | null;
   registerStatusLabel: string | null;
   bodyType: string | null;
   bodyTypeLabel: string | null;
@@ -422,6 +429,11 @@ export function LaboratoryDetailView({ lab }: { lab: Laboratory }) {
   // page has to say so rather than let it pass for a register record.
   const selfRegistered = lab.source === "SELF_REGISTERED";
 
+  // Imported from one of the two national registers, so there is an upstream
+  // source to name, date and link. A self-registered entry has none — its own
+  // notice above already says the page has not been checked against anything.
+  const fromRegister = !selfRegistered && Boolean(lab.register && REGISTER_LABELS[lab.register]);
+
   const accreditationRows: Row[] = [
     ...row(t("accreditationNumber"), lab.accreditationNumber),
     // Which national register this record was imported from.
@@ -646,6 +658,13 @@ export function LaboratoryDetailView({ lab }: { lab: Laboratory }) {
       )}
 
       <Section title={t("sectionAccreditation")} rows={accreditationRows} />
+
+      {/* Directly after the accreditation data it qualifies: a reader deciding
+          whether to trust the status needs to know how recently we saw it. */}
+      {fromRegister && lab.register && (
+        <RecordProvenance register={lab.register} lastSeenAt={lab.lastSeenAt} />
+      )}
+
       <Section title={t("sectionOrganisation")} rows={organisationRows} />
       <Section
         title={t("sectionContacts")}

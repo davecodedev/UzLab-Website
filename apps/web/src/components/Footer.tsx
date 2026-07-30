@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useLang, pick } from "@/lib/i18n";
+import { REGISTER_SITES } from "@/components/DataProvenance";
 
 const FOOTER_DICT = {
   about: { ru: "О нас", uz: "Biz haqimizda", en: "About" },
@@ -11,6 +12,20 @@ const FOOTER_DICT = {
     ru: "Ташкент, ул. Шифонур, 3/1",
     uz: "Toshkent, Shifonur ko'chasi, 3/1",
     en: "Tashkent, 3/1 Shifonur St.",
+  },
+  // Says on every page that the registry is a copy, and where the originals
+  // are. No dates or counts here — the footer fetches nothing; the registry
+  // page's provenance block reports how current the copy is.
+  sourcePrefix: {
+    ru: "Данные реестра — из государственных реестров",
+    uz: "Reyestr ma'lumotlari",
+    en: "Registry data is sourced from the national registers",
+  },
+  sourceConjunction: { ru: "и", uz: "va", en: "and" },
+  sourceSuffix: {
+    ru: "",
+    uz: " davlat reyestrlaridan olingan",
+    en: "",
   },
 } as const;
 
@@ -45,6 +60,24 @@ export function Footer() {
         <span className="text-[13px]" style={{ color: "#5A6B85" }}>
           © {new Date().getFullYear()} UzLab · {pick(FOOTER_DICT.address, lang)}
         </span>
+        <p className="basis-full text-[12.5px] leading-relaxed" style={{ color: "#5A6B85" }}>
+          {pick(FOOTER_DICT.sourcePrefix, lang)}{" "}
+          {REGISTER_SITES.map((site, i) => (
+            <span key={site.url}>
+              {i > 0 && <>{` ${pick(FOOTER_DICT.sourceConjunction, lang)} `}</>}
+              <a
+                href={site.url}
+                target="_blank"
+                rel="noreferrer"
+                className="underline underline-offset-2"
+                style={{ color: "#8494AC" }}
+              >
+                {site.name}
+              </a>
+            </span>
+          ))}
+          {pick(FOOTER_DICT.sourceSuffix, lang)}.
+        </p>
       </div>
     </footer>
   );

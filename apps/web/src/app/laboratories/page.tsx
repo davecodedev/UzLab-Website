@@ -1,5 +1,10 @@
 import { RegistryApp } from "@/components/registry/RegistryApp";
 import { AddLaboratoryPrompt } from "@/components/registry/AddLaboratoryPrompt";
+import {
+  DataProvenance,
+  PROVENANCE_PATH,
+  type ProvenanceSource,
+} from "@/components/DataProvenance";
 import type { Laboratory } from "@/components/registry/registry-data";
 import { api } from "@/lib/api";
 
@@ -13,12 +18,24 @@ async function getLaboratories(): Promise<Laboratory[]> {
   }
 }
 
+// Where the records come from and when each register was last confirmed. An
+// empty list renders nothing: better to say nothing than to imply freshness we
+// cannot currently vouch for.
+async function getProvenance(): Promise<ProvenanceSource[]> {
+  try {
+    return await api.get<ProvenanceSource[]>(PROVENANCE_PATH);
+  } catch {
+    return [];
+  }
+}
+
 export default async function LaboratoriesPage() {
-  const laboratories = await getLaboratories();
+  const [laboratories, provenance] = await Promise.all([getLaboratories(), getProvenance()]);
   return (
     <>
       <RegistryApp laboratories={laboratories} />
       <AddLaboratoryPrompt />
+      <DataProvenance sources={provenance} />
     </>
   );
 }
