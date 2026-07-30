@@ -43,6 +43,84 @@ export interface SubmitLaboratoryPayload {
   isUzLabMember?: boolean;
 }
 
+/** The Laboratory row POST /laboratories/submissions creates. */
+export interface SubmittedLaboratory {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+// --- Uploaded documents -----------------------------------------------------
+// POST /laboratories/submissions/analyze reads a PDF and suggests field values
+// without saving anything; POST /laboratories/submissions/:id/documents/:kind
+// attaches the file once the laboratory exists.
+
+/** `LaboratoryDocumentKind` in prisma/schema.prisma. */
+export type LaboratoryDocumentKind = "CERTIFICATE" | "SCOPE";
+
+export const DOCUMENT_KINDS: LaboratoryDocumentKind[] = ["CERTIFICATE", "SCOPE"];
+
+/** `MAX_DOCUMENT_BYTES` in apps/api/src/modules/laboratories/documents.service.ts. */
+export const MAX_DOCUMENT_BYTES = 15 * 1024 * 1024;
+
+/**
+ * The form fields the analyzer can suggest a value for. It is deliberately
+ * conservative — a key is present only when the text matched with confidence,
+ * so most documents fill in only some of these.
+ */
+export const SUGGESTIBLE_FIELDS = [
+  "accreditationNumber",
+  "taxId",
+  "standard",
+  "email",
+  "phone",
+  "region",
+] as const;
+
+export type SuggestibleField = (typeof SUGGESTIBLE_FIELDS)[number];
+
+export type DocumentSuggestions = Partial<Record<SuggestibleField, string>>;
+
+/** Response of POST /laboratories/submissions/analyze. Nothing is stored. */
+export interface AnalyzedDocument {
+  kind: LaboratoryDocumentKind;
+  filename: string;
+  sizeBytes: number;
+  characters: number;
+  suggested: DocumentSuggestions;
+  /** First ~400 characters, so the member can confirm we read the right file. */
+  preview: string;
+}
+
+/** Document metadata as it travels with a laboratory record. */
+export interface LaboratoryDocumentMeta {
+  id: string;
+  kind: LaboratoryDocumentKind;
+  filename: string;
+  sizeBytes: number;
+}
+
+/** Public route that streams a stored PDF inline. Pass to `apiUrl`. */
+export function laboratoryDocumentPath(
+  laboratoryId: string,
+  kind: LaboratoryDocumentKind,
+): string {
+  return `/laboratories/${laboratoryId}/documents/${kind}`;
+}
+
+const SIZE_UNITS: Record<Lang, { kb: string; mb: string }> = {
+  ru: { kb: "КБ", mb: "МБ" },
+  uz: { kb: "KB", mb: "MB" },
+  en: { kb: "KB", mb: "MB" },
+};
+
+export function formatFileSize(bytes: number, lang: Lang): string {
+  const units = SIZE_UNITS[lang];
+  const mb = bytes / 1024 / 1024;
+  if (mb >= 1) return `${mb.toFixed(1)} ${units.mb}`;
+  return `${Math.max(1, Math.round(bytes / 1024))} ${units.kb}`;
+}
+
 /**
  * One entry of GET /laboratories/submissions/mine — the Laboratory row the
  * member created. Only the fields the account page reads are declared.

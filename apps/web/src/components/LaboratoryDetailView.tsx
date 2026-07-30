@@ -3,8 +3,14 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { useLang, pick, type Lang } from "@/lib/i18n";
+import { apiUrl } from "@/lib/api";
 import { LaboratoryClaimForm } from "@/components/LaboratoryClaimForm";
 import type { LaboratoryProfile } from "@/lib/claims";
+import {
+  formatFileSize,
+  laboratoryDocumentPath,
+  type LaboratoryDocumentMeta,
+} from "@/lib/submissions";
 
 // Shape of GET /laboratories/{slug} — the full Prisma `Laboratory` record.
 // See apps/api/prisma/schema.prisma (model Laboratory). Everything under
@@ -52,6 +58,13 @@ export interface Laboratory {
   scopeUrl: string | null;
   scopeText: string | null;
   directions: string[];
+
+  /**
+   * PDFs the laboratory uploaded itself when its entry was submitted, stored by
+   * us rather than linked from a register. Metadata only — the bytes are
+   * streamed from GET /laboratories/{id}/documents/{kind}.
+   */
+  documents?: LaboratoryDocumentMeta[];
 
   // Supplementary detail supplied by the laboratory itself, once a member's
   // claim has been approved. Null while nobody has filled it in. It is shown
@@ -185,6 +198,21 @@ const T = {
     ru: "Документы размещены на сайте центра аккредитации O'zAkk (akkred.uz) и открываются в новой вкладке.",
     uz: "Hujjatlar O'zAkk akkreditatsiya markazi saytida (akkred.uz) joylashgan va yangi oynada ochiladi.",
     en: "The documents are hosted by the O'zAkk accreditation centre (akkred.uz) and open in a new tab.",
+  },
+  registerDocsHeading: {
+    ru: "Из национального реестра",
+    uz: "Milliy reyestrdan",
+    en: "From the national register",
+  },
+  uploadedDocsHeading: {
+    ru: "Загружено лабораторией",
+    uz: "Laboratoriya yuklagan",
+    en: "Uploaded by the laboratory",
+  },
+  uploadedDocsNote: {
+    ru: "Эти файлы загрузила сама лаборатория вместе с заявкой на добавление записи. Они не из национального реестра и не сверялись с ним.",
+    uz: "Bu fayllarni laboratoriyaning o'zi yozuv qo'shish arizasi bilan birga yuklagan. Ular milliy reyestrdan olinmagan va u bilan solishtirilmagan.",
+    en: "These files were uploaded by the laboratory itself with its request to add the entry. They do not come from a national register and have not been checked against one.",
   },
   showScope: {
     ru: "Показать область аккредитации",
@@ -521,6 +549,10 @@ export function LaboratoryDetailView({ lab }: { lab: Laboratory }) {
     ...(lab.scopeUrl ? [{ href: lab.scopeUrl, label: t("scopeDoc") }] : []),
   ];
 
+  // Kept apart from the register's own links: these are the laboratory's word,
+  // stored by us, and the page has to say which is which.
+  const uploadedDocuments = lab.documents ?? [];
+
   const scopeText = lab.scopeText?.trim() ?? "";
   const scopeTruncated = scopeText.length > SCOPE_CHAR_LIMIT;
   const scopeShown = scopeTruncated ? scopeText.slice(0, SCOPE_CHAR_LIMIT) : scopeText;
@@ -722,7 +754,7 @@ export function LaboratoryDetailView({ lab }: { lab: Laboratory }) {
         </section>
       )}
 
-      {documents.length > 0 && (
+      {(documents.length > 0 || uploadedDocuments.length > 0) && (
         <section className="mt-10 pt-8" style={{ borderTop: "1px solid var(--uz-border)" }}>
           <h2
             className="text-xs font-semibold uppercase tracking-wider"
@@ -730,24 +762,64 @@ export function LaboratoryDetailView({ lab }: { lab: Laboratory }) {
           >
             {t("sectionDocuments")}
           </h2>
-          <ul className="mt-4 space-y-2 text-sm">
-            {documents.map((doc) => (
-              <li key={doc.href}>
-                <a
-                  href={doc.href}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-medium hover:underline"
-                  style={{ color: "var(--uz-blue-700)" }}
-                >
-                  {doc.label}
-                </a>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-3 text-xs" style={{ color: "var(--uz-text-faint)" }}>
-            {t("documentsNote")}
-          </p>
+
+          {documents.length > 0 && (
+            <>
+              {/* Only worth naming the source when both kinds are on the page. */}
+              {uploadedDocuments.length > 0 && (
+                <h3 className="mt-4 text-sm font-bold" style={{ color: "var(--uz-navy-900)" }}>
+                  {t("registerDocsHeading")}
+                </h3>
+              )}
+              <ul className="mt-4 space-y-2 text-sm">
+                {documents.map((doc) => (
+                  <li key={doc.href}>
+                    <a
+                      href={doc.href}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-medium hover:underline"
+                      style={{ color: "var(--uz-blue-700)" }}
+                    >
+                      {doc.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-3 text-xs" style={{ color: "var(--uz-text-faint)" }}>
+                {t("documentsNote")}
+              </p>
+            </>
+          )}
+
+          {uploadedDocuments.length > 0 && (
+            <div className={documents.length > 0 ? "mt-6" : ""}>
+              <h3 className="mt-4 text-sm font-bold" style={{ color: "var(--uz-navy-900)" }}>
+                {t("uploadedDocsHeading")}
+              </h3>
+              <ul className="mt-3 space-y-2 text-sm">
+                {uploadedDocuments.map((doc) => (
+                  <li key={doc.id}>
+                    <a
+                      href={apiUrl(laboratoryDocumentPath(lab.id, doc.kind))}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-medium hover:underline"
+                      style={{ color: "var(--uz-blue-700)" }}
+                    >
+                      {doc.kind === "CERTIFICATE" ? t("certificateDoc") : t("scopeDoc")}
+                    </a>
+                    <span className="ml-2 text-xs" style={{ color: "var(--uz-text-faint)" }}>
+                      {doc.filename} · {formatFileSize(doc.sizeBytes, lang)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-3 text-xs leading-relaxed" style={{ color: "var(--uz-text-faint)" }}>
+                {t("uploadedDocsNote")}
+              </p>
+            </div>
+          )}
         </section>
       )}
 

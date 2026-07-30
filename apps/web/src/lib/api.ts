@@ -9,6 +9,14 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Absolute URL of an API route, for the cases `request` cannot serve: links the
+ * browser follows itself (an inline PDF) and multipart uploads.
+ */
+export function apiUrl(path: string): string {
+  return `${API_URL}/api${path}`;
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_URL}/api${path}`, {
     ...options,
@@ -29,6 +37,68 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 
   return res.json() as Promise<T>;
+}
+
+/** class-validator returns `message` as an array; everything else as a string. */
+function errorMessage(body: { message?: string | string[] }, fallback: string): string {
+  if (Array.isArray(body.message)) return body.message.join(" ");
+  return body.message ?? fallback;
+}
+
+export interface UploadOptions {
+  token: string;
+  /** 0–100, fired while the bytes are going out. */
+  onProgress?: (percent: number) => void;
+}
+
+/**
+ * multipart/form-data POST of a single file under the field name `file`.
+ *
+ * XMLHttpRequest rather than fetch: a 15 MB PDF on a slow connection takes long
+ * enough that the member needs a progress bar, and fetch exposes no upload
+ * progress event.
+ *
+ * A failed request rejects with `ApiError`. Status 0 means the request never
+ * reached the API (offline, aborted, CORS) — callers show their own wording for
+ * that rather than the placeholder message here.
+ */
+export function uploadFile<T>(path: string, file: File, opts: UploadOptions): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const form = new FormData();
+    form.append("file", file);
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", apiUrl(path));
+    xhr.setRequestHeader("Authorization", `Bearer ${opts.token}`);
+    // Content-Type is deliberately not set: the browser has to add the
+    // multipart boundary, and overriding the header makes the body unparseable.
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        opts.onProgress?.(Math.round((event.loaded / event.total) * 100));
+      }
+    };
+
+    xhr.onload = () => {
+      let body: { message?: string | string[] } = {};
+      try {
+        body = JSON.parse(xhr.responseText) as { message?: string | string[] };
+      } catch {
+        // A proxy error page rather than the API's JSON — keep the empty body.
+      }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(body as T);
+        return;
+      }
+      reject(new ApiError(xhr.status, errorMessage(body, xhr.statusText || "Upload failed")));
+    };
+
+    xhr.onerror = () => reject(new ApiError(0, "Network error"));
+    xhr.onabort = () => reject(new ApiError(0, "Upload aborted"));
+    xhr.ontimeout = () => reject(new ApiError(0, "Upload timed out"));
+
+    xhr.send(form);
+  });
 }
 
 export const api = {
