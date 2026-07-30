@@ -250,8 +250,9 @@ model Laboratory {
   reviewedAt        DateTime?
   reviewNote        String?
 
-  claims  LaboratoryClaim[]
-  profile LaboratoryProfile?
+  claims    LaboratoryClaim[]
+  profile   LaboratoryProfile?
+  documents LaboratoryDocument[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -340,6 +341,46 @@ model LaboratoryProfile {
   updatedByUserId String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+// --- Uploaded documents -----------------------------------------------------
+// Records imported from a national register link to PDFs hosted by O'zAkk or
+// Depstan. A member-added laboratory has no such upstream, so its documents are
+// stored here.
+//
+// The bytes live in Postgres rather than object storage: there is no S3 bucket
+// configured, and at ~175 KB per scope document this stays small for a long
+// while. If member uploads ever run to thousands, these rows are the first
+// thing to move out — the table is deliberately separate from Laboratory so
+// that migration touches nothing else, and so a listing query never drags
+// megabytes of PDF along with it.
+
+enum LaboratoryDocumentKind {
+  CERTIFICATE
+  SCOPE
+}
+
+model LaboratoryDocument {
+  id           String                 @id @default(uuid())
+  laboratoryId String
+  laboratory   Laboratory             @relation(fields: [laboratoryId], references: [id], onDelete: Cascade)
+  kind         LaboratoryDocumentKind
+
+  filename  String
+  mimeType  String
+  sizeBytes Int
+  data      Bytes
+
+  /// Text layer pulled out at upload time, so an uploaded document is as
+  /// searchable as a scraped one. Null when the PDF had no extractable text.
+  extractedText String?
+
+  uploadedByUserId String?
+  createdAt        DateTime @default(now())
+
+  /// One document of each kind per laboratory; re-uploading replaces it.
+  @@unique([laboratoryId, kind])
+  @@index([laboratoryId])
 }
 
 // --- Import auditing -------------------------------------------------------

@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { ConformityBodyType, Prisma } from '@prisma/client';
 
 /** Body types that count as laboratories — mirrors the importers. */
@@ -95,7 +95,11 @@ export class LaboratoriesService {
       where: { slug, deletedAt: null, isPublished: true },
       // Member-supplied detail travels with the record; the page shows it
       // alongside the register's own data rather than replacing it.
-      include: { profile: true },
+      // Document metadata only — the bytes are streamed from their own route.
+      include: {
+        profile: true,
+        documents: { select: { id: true, kind: true, filename: true, sizeBytes: true } },
+      },
     });
     if (!lab) {
       throw new NotFoundException('Laboratory not found');
@@ -209,6 +213,18 @@ export class LaboratoriesService {
         submittedAt: new Date(),
       },
     });
+  }
+
+  /**
+   * Guards document uploads: only the member who submitted a laboratory may
+   * attach files to it, and only while it is still theirs to edit.
+   */
+  async assertSubmitter(userId: string, laboratoryId: string) {
+    const lab = await this.prisma.laboratory.findFirst({
+      where: { id: laboratoryId, submittedByUserId: userId },
+      select: { id: true },
+    });
+    if (!lab) throw new ForbiddenException('You did not submit this laboratory.');
   }
 
   /** Member-submitted entries awaiting a staff decision. */

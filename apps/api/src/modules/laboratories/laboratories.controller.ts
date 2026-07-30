@@ -1,4 +1,25 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Res,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import type { Response } from 'express';
+import { LaboratoryDocumentKind } from '@prisma/client';
+import {
+  LaboratoryDocumentsService,
+  MAX_DOCUMENT_BYTES,
+  type UploadedFile as UploadedFileType,
+} from './documents.service.js';
 import { LaboratoriesService } from './laboratories.service.js';
 import { ListLaboratoriesDto } from './dto/list-laboratories.dto.js';
 import { CreateLaboratoryDto } from './dto/create-laboratory.dto.js';
@@ -12,7 +33,10 @@ import { UserRole } from '@prisma/client';
 
 @Controller('laboratories')
 export class LaboratoriesController {
-  constructor(private readonly laboratoriesService: LaboratoriesService) {}
+  constructor(
+    private readonly laboratoriesService: LaboratoriesService,
+    private readonly documents: LaboratoryDocumentsService,
+  ) {}
 
   @Get()
   list(@Query() query: ListLaboratoriesDto) {
@@ -45,6 +69,49 @@ export class LaboratoriesController {
   @Post('submissions')
   submit(@CurrentUser() user: { id: string }, @Body() dto: SubmitLaboratoryDto) {
     return this.laboratoriesService.submit(user.id, dto);
+  }
+
+  /**
+   * Reads an uploaded certificate or scope PDF and returns the field values
+   * found in it, saving nothing. The submitter reviews and corrects them before
+   * the record is created — extraction guesses, it does not decide.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('submissions/analyze')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_DOCUMENT_BYTES } }))
+  analyzeDocument(@UploadedFile() file: UploadedFileType) {
+    return this.documents.analyze(file);
+  }
+
+  /** Attaches a document to a laboratory the member has already submitted. */
+  @UseGuards(JwtAuthGuard)
+  @Post('submissions/:id/documents/:kind')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_DOCUMENT_BYTES } }))
+  async attachDocument(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+    @Param('kind') kind: LaboratoryDocumentKind,
+    @UploadedFile() file: UploadedFileType,
+  ) {
+    await this.laboratoriesService.assertSubmitter(user.id, id);
+    return this.documents.attach(id, kind, file, user.id);
+  }
+
+  @Get(':id/documents/:kind')
+  async downloadDocument(
+    @Param('id') id: string,
+    @Param('kind') kind: LaboratoryDocumentKind,
+    @Res() res: Response,
+  ) {
+    const doc = await this.documents.download(id, kind);
+    res.setHeader('Content-Type', doc.mimeType);
+    res.setHeader('Content-Length', String(doc.sizeBytes));
+    // `inline` so the browser previews it rather than forcing a download.
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename="${doc.filename.replace(/[^\w.\-]/g, '_')}"`,
+    );
+    res.end(Buffer.from(doc.data));
   }
 
   @UseGuards(JwtAuthGuard)

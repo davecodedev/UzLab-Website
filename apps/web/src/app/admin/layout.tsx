@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { clearSession, getStoredUser, isStaff, type StoredUser } from "@/lib/auth-client";
+import { usePendingCounts } from "@/lib/admin-counts";
 
 /**
  * Navigation is grouped by what the work actually is, not by database table.
@@ -57,6 +58,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const [user, setUser] = useState<StoredUser | null | undefined>(undefined);
   const [navOpen, setNavOpen] = useState(false);
+  const counts = usePendingCounts();
 
   useEffect(() => {
     const stored = getStoredUser();
@@ -135,7 +137,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                       fontWeight: active ? 600 : 400,
                     }}
                   >
-                    {link.label}
+                    <span className="flex items-center justify-between gap-2">
+                      <span>{link.label}</span>
+                      {/* Only shown when something is actually waiting — a "0"
+                          on every row would be noise, not information. */}
+                      {(counts[link.href] ?? 0) > 0 && (
+                        <span
+                          className="rounded-full px-1.5 py-px text-[10.5px] font-bold leading-[1.4]"
+                          style={{
+                            background: active ? "rgba(255,255,255,0.25)" : "#F59E0B",
+                            color: active ? "#fff" : "#111827",
+                          }}
+                        >
+                          {counts[link.href]}
+                        </span>
+                      )}
+                    </span>
                   </Link>
                 );
               })}
