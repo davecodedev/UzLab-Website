@@ -1,7 +1,7 @@
 import { RegistryApp } from "@/components/registry/RegistryApp";
 import { AddLaboratoryPrompt } from "@/components/registry/AddLaboratoryPrompt";
 import { DataProvenance } from "@/components/DataProvenance";
-import { PROVENANCE_PATH, type ProvenanceSource } from "@/lib/provenance";
+import { LABORATORY_SOURCES, PROVENANCE_PATH, type ProvenanceSource } from "@/lib/provenance";
 import type { Laboratory } from "@/components/registry/registry-data";
 import { api } from "@/lib/api";
 
@@ -33,7 +33,7 @@ export default async function LaboratoriesPage() {
     <>
       <RegistryApp laboratories={laboratories} />
       <AddLaboratoryPrompt />
-      <DataProvenance sources={provenance} />
+      <DataProvenance sources={provenance} only={LABORATORY_SOURCES} />
     </>
   );
 }

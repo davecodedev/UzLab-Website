@@ -37,3 +37,12 @@ export const REGISTER_SITES = [
   { name: "O'zAkk", url: "https://akkred.uz/uz/reestr" },
   { name: "Depstan", url: "https://approval.depstan.uz/" },
 ] as const;
+
+/**
+ * Which sources belong on which page. `/imports/provenance` reports every
+ * source the site holds; a page must show only the ones its own data came from,
+ * or the registry would claim a standards catalogue as its provenance and the
+ * catalogue would claim an accreditation register as its own.
+ */
+export const LABORATORY_SOURCES = ["AKKRED", "DEPSTAN"] as const;
+export const STANDARD_SOURCES = ["UZSTI", "MGS"] as const;

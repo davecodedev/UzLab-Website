@@ -33,6 +33,11 @@ const T = {
     uz: "Reyestr yozuvlari — O'zbekistonning ikkita davlat reyestridan olingan nusxa. Biz ularni birlamchi manba bilan muntazam solishtiramiz, lekin yuridik kuchga faqat rasmiy versiya ega: uni quyidagi havolalar orqali ochish mumkin.",
     en: "These entries are a copy of two Uzbek national registers. We re-check them against the source regularly, but the official version is the authoritative one — open it from the links below.",
   },
+  introStandards: {
+    ru: "Карточки документов — копия двух каталогов стандартов. Мы регулярно сверяем их с первоисточником, но официальный текст стандарта распространяют только сами каталоги: их можно открыть по ссылкам ниже.",
+    uz: "Hujjat kartalari — ikkita standartlar katalogidan olingan nusxa. Biz ularni birlamchi manba bilan muntazam solishtiramiz, lekin standartning rasmiy matnini faqat kataloglarning o'zi tarqatadi: ularni quyidagi havolalar orqali ochish mumkin.",
+    en: "These entries are a copy of two standards catalogues. We re-check them against the source regularly, but only the catalogues themselves distribute the official text — open them from the links below.",
+  },
   records: { ru: "Записей", uz: "Yozuvlar", en: "Records" },
   refresh: { ru: "Сверка", uz: "Solishtirish", en: "Re-checked" },
   verified: {
@@ -92,6 +97,7 @@ const T = {
 const REFRESH_LABELS: Record<string, Record<Lang, string>> = {
   hourly: { ru: "ежечасно", uz: "har soatda", en: "hourly" },
   daily: { ru: "ежедневно", uz: "har kuni", en: "daily" },
+  weekly: { ru: "еженедельно", uz: "har hafta", en: "weekly" },
 };
 
 /**
@@ -181,7 +187,17 @@ function OfficialLink({ url, label }: { url: string; label: string }) {
  * how often we re-check it, when that last happened and where to read the
  * authoritative version.
  */
-export function DataProvenance({ sources: initial }: { sources: ProvenanceSource[] }) {
+export function DataProvenance({
+  sources: initial,
+  only,
+  kind = "laboratories",
+}: {
+  sources: ProvenanceSource[];
+  /** Restrict to these registers — see LABORATORY_SOURCES / STANDARD_SOURCES. */
+  only?: readonly string[];
+  /** Which wording to use: these are copies of registers, or of catalogues. */
+  kind?: "laboratories" | "standards";
+}) {
   const { lang } = useLang();
   const now = useNow();
 
@@ -204,7 +220,8 @@ export function DataProvenance({ sources: initial }: { sources: ProvenanceSource
     };
   }, [initial.length]);
 
-  const sources = initial.length > 0 ? initial : (fetched ?? []);
+  const all = initial.length > 0 ? initial : (fetched ?? []);
+  const sources = only ? all.filter((s) => only.includes(s.register)) : all;
 
   // Still loading: show nothing rather than flashing a failure notice.
   if (sources.length === 0 && !failed) return null;
@@ -247,7 +264,7 @@ export function DataProvenance({ sources: initial }: { sources: ProvenanceSource
           {pick(T.title, lang)}
         </h2>
         <p className="mt-2 max-w-[70ch] text-sm leading-relaxed" style={{ color: "var(--uz-text-muted)" }}>
-          {pick(T.intro, lang)}
+          {pick(kind === "standards" ? T.introStandards : T.intro, lang)}
         </p>
 
         <ul className="mt-4 grid gap-3 sm:grid-cols-2">

@@ -1,6 +1,6 @@
 import { StandardsApp } from "@/components/standards/StandardsApp";
 import { DataProvenance } from "@/components/DataProvenance";
-import { PROVENANCE_PATH, type ProvenanceSource } from "@/lib/provenance";
+import { PROVENANCE_PATH, STANDARD_SOURCES, type ProvenanceSource } from "@/lib/provenance";
 import { api } from "@/lib/api";
 
 // The catalogue itself is fetched in the browser: it is far too large to ship
@@ -20,7 +20,7 @@ export default async function StandardsPage() {
   return (
     <>
       <StandardsApp />
-      <DataProvenance sources={provenance} />
+      <DataProvenance sources={provenance} only={STANDARD_SOURCES} kind="standards" />
     </>
   );
 }
