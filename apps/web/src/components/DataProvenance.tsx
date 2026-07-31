@@ -216,8 +216,8 @@ export function DataProvenance({ sources: initial }: { sources: ProvenanceSource
           className="rounded-xl px-5 py-4 text-sm leading-relaxed"
           style={{
             background: "var(--uz-warning-bg)",
-            border: "1px solid var(--uz-warning-border)",
-            color: "var(--uz-warning-foreground)",
+            border: "1px solid var(--uz-warning)",
+            color: "var(--uz-text)",
           }}
         >
           {pick(T.unavailable, lang)}{" "}

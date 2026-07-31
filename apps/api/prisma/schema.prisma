@@ -200,24 +200,24 @@ model Laboratory {
   // --- National register detail (O'zAkk / akkred.uz) --------------------
   // Populated by scripts/import-akkred-registry.ts from the public register
   // API. All optional: a self-registered lab has none of these.
-  register             NationalRegister? // which national register this row came from
-  registerStatusLabel  String? // the register's own status wording, before mapping to the enum
-  bodyType             ConformityBodyType? // which kind of conformity-assessment body
-  bodyTypeLabel        String? // O'zAkk's own Uzbek label for the type
-  isLaboratory         Boolean             @default(true) // false for certification/inspection bodies
-  externalId           Int? // O'zAkk internal numeric id
-  externalUid          String? // O'zAkk uuid
-  legalEntityName      String? // parent legal entity (often differs from the body's own name)
-  legalEntityAddress   String? // registered legal address
-  supervisorName       String? // head of the laboratory / body
-  standard             String? // e.g. "O'z DSt ISO/IEC 17025:2019"
-  accreditationDate    DateTime? // first accreditation
-  reAccreditationDate  DateTime?
-  statusDate           DateTime? // date the current status took effect
-  certificateUrl       String? // accreditation certificate PDF (hosted by O'zAkk)
-  scopeUrl             String? // scope-of-accreditation PDF (hosted by O'zAkk)
-  scopeText            String? // full scope table as plain text
-  directions           String[]            @default([]) // industry sectors covered
+  register            NationalRegister? // which national register this row came from
+  registerStatusLabel String? // the register's own status wording, before mapping to the enum
+  bodyType            ConformityBodyType? // which kind of conformity-assessment body
+  bodyTypeLabel       String? // O'zAkk's own Uzbek label for the type
+  isLaboratory        Boolean             @default(true) // false for certification/inspection bodies
+  externalId          Int? // O'zAkk internal numeric id
+  externalUid         String? // O'zAkk uuid
+  legalEntityName     String? // parent legal entity (often differs from the body's own name)
+  legalEntityAddress  String? // registered legal address
+  supervisorName      String? // head of the laboratory / body
+  standard            String? // e.g. "O'z DSt ISO/IEC 17025:2019"
+  accreditationDate   DateTime? // first accreditation
+  reAccreditationDate DateTime?
+  statusDate          DateTime? // date the current status took effect
+  certificateUrl      String? // accreditation certificate PDF (hosted by O'zAkk)
+  scopeUrl            String? // scope-of-accreditation PDF (hosted by O'zAkk)
+  scopeText           String? // full scope table as plain text
+  directions          String[]            @default([]) // industry sectors covered
 
   /// Script-neutral search key: every searchable field folded to bare lowercase
   /// Latin by common/utils/translit.ts, including the full scope text. Lets a
@@ -396,10 +396,18 @@ enum ImportRunStatus {
 }
 
 model ImportRun {
-  id       String           @id @default(uuid())
-  register NationalRegister
-  status   ImportRunStatus
-  trigger  String           @default("manual") // "cron" | "manual"
+  id String @id @default(uuid())
+
+  // Exactly one of these is set. A run refreshes either a laboratory register
+  // or a standards catalogue, and the two have nothing in common but this
+  // audit trail — keeping them in one table is what lets /admin/imports and the
+  // public provenance block answer "when was this last checked?" the same way
+  // for every source on the site.
+  register         NationalRegister?
+  standardRegister StandardRegister?
+
+  status  ImportRunStatus
+  trigger String          @default("manual") // "cron" | "manual"
 
   startedAt  DateTime  @default(now())
   finishedAt DateTime?
@@ -417,6 +425,7 @@ model ImportRun {
   warnings String[] @default([])
 
   @@index([register, startedAt])
+  @@index([standardRegister, startedAt])
   @@index([startedAt])
 }
 
@@ -461,4 +470,91 @@ model ContactSubmission {
   createdAt DateTime                @default(now())
 
   @@index([status])
+}
+
+// --- Standards catalogue -------------------------------------------------
+
+// Where a standard was read from. Neither is an accreditation register: these
+// are catalogues of the documents laboratories are accredited *against*, which
+// is why they are a separate entity rather than more columns on Laboratory.
+enum StandardRegister {
+  MGS // mgscatalog.by — EASC interstate (GOST) catalogue, published from Belarus
+  UZSTI // uzsti.uz — O'zbekiston Standartlar Instituti
+}
+
+// Each catalogue words its own state differently ("Введен впервые", "Заменен",
+// "amalda"); `statusLabel` keeps the original and this is the mapping the
+// filters use.
+enum StandardStatus {
+  IN_FORCE
+  SUPERSEDED // replaced by a newer document
+  WITHDRAWN // cancelled without replacement
+  NOT_YET_IN_FORCE // adopted, effective date still in the future
+  UNKNOWN
+}
+
+model Standard {
+  id       String           @id @default(uuid())
+  slug     String           @unique
+  register StandardRegister
+
+  /// The catalogue's own identifier — UrlRN for MGS, the numeric id for UZSTI.
+  /// Unique only within a register: the two catalogues number independently.
+  sourceId  String
+  sourceUrl String
+
+  /// "ГОСТ EN 581-1-2022", "OʻzMSt ISO 6993-4:2026" — how the document is cited.
+  designation String
+  title       String
+  /// Область применения / anotatsiya — what the document actually covers.
+  abstract    String?
+
+  status      StandardStatus @default(UNKNOWN)
+  /// The catalogue's own wording, kept verbatim beside the mapped enum.
+  statusLabel String?
+
+  /// ICS classification: "75" and "Добыча и переработка нефти, газа...".
+  icsCode  String?
+  icsLabel String?
+  /// The catalogue's own grouping — "Milliy standartlar", "ГОСТ - межгосударственные стандарты".
+  category String?
+  language String?
+
+  year      Int?
+  pageCount Int?
+  /// UZSTI sells its documents; MGS does not. Stored in so'm, as published.
+  priceUzs  Int?
+
+  effectiveFrom  DateTime?
+  effectiveUntil DateTime?
+
+  // --- Detail-page fields (MGS) ------------------------------------------
+  // The listing crawl covers every document; these come from the per-document
+  // page, which is fetched gradually afterwards. `detailFetchedAt` null means
+  // this row is listing-only so far — not that the source has no detail.
+  developer          String?
+  technicalCommittee String?
+  adoptingStates     String[]  @default([])
+  detailFetchedAt    DateTime?
+
+  /// Folded, script-neutral search key — see Laboratory.searchText.
+  searchText String?
+
+  // Lifecycle, exactly as the laboratory registers: a document the catalogue
+  // stops listing is stamped, never deleted.
+  lastSeenAt    DateTime?
+  disappearedAt DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@unique([register, sourceId])
+  @@index([register])
+  @@index([status])
+  @@index([icsCode])
+  @@index([year])
+  @@index([disappearedAt])
+  @@index([deletedAt])
+  @@index([detailFetchedAt])
 }

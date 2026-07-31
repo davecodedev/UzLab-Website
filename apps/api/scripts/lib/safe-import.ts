@@ -74,13 +74,17 @@ export interface RunOptions {
   force?: boolean;
 }
 
-interface Verdict {
+export interface Verdict {
   ok: boolean;
   reason?: string;
   warnings: string[];
 }
 
-function judge(
+/**
+ * Exported so the standards catalogue import can apply the same thresholds.
+ * The rules are about the *shape* of a crawl, not about laboratories.
+ */
+export function judge(
   result: ScrapeResult,
   existingCount: number,
   limits: SanityLimits,

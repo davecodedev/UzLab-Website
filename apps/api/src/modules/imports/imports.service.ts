@@ -1,6 +1,26 @@
 import { Injectable } from '@nestjs/common';
-import { NationalRegister } from '@prisma/client';
+import { NationalRegister, StandardRegister } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
+
+/**
+ * The standards catalogues, described the same way the registers are. Refresh
+ * cadence is stated here because it is a fact about how we operate, not
+ * something either catalogue publishes.
+ */
+const STANDARD_SOURCES = [
+  {
+    register: StandardRegister.UZSTI,
+    name: "O'zbekiston Standartlar Instituti (UZSTI)",
+    url: 'https://uzsti.uz/shop?group=milliy',
+    refresh: 'daily',
+  },
+  {
+    register: StandardRegister.MGS,
+    name: 'Межгосударственный совет по стандартизации, метрологии и сертификации (МГС)',
+    url: 'https://mgscatalog.by/',
+    refresh: 'weekly',
+  },
+] as const;
 
 @Injectable()
 export class ImportsService {
@@ -23,7 +43,7 @@ export class ImportsService {
   async summary() {
     const registers = Object.values(NationalRegister);
 
-    return Promise.all(
+    const laboratories = await Promise.all(
       registers.map(async (register) => {
         const [lastRun, lastSuccess, lastVerified, active, disappeared] = await Promise.all([
           this.prisma.importRun.findFirst({
@@ -47,9 +67,53 @@ export class ImportsService {
           this.prisma.laboratory.count({ where: { register, disappearedAt: { not: null } } }),
         ]);
 
-        return { register, lastRun, lastSuccess, lastVerified, active, disappeared };
+        return {
+          kind: 'laboratories' as const,
+          register,
+          lastRun,
+          lastSuccess,
+          lastVerified,
+          active,
+          disappeared,
+        };
       }),
     );
+
+    // Same shape for the standards catalogues so one table can show every
+    // source: an operator wants "is anything stale?" answered once, not per
+    // kind of thing we import.
+    const standards = await Promise.all(
+      Object.values(StandardRegister).map(async (register) => {
+        const [lastRun, lastSuccess, lastVerified, active, disappeared] = await Promise.all([
+          this.prisma.importRun.findFirst({
+            where: { standardRegister: register },
+            orderBy: { startedAt: 'desc' },
+          }),
+          this.prisma.importRun.findFirst({
+            where: { standardRegister: register, status: 'SUCCESS' },
+            orderBy: { startedAt: 'desc' },
+          }),
+          this.prisma.importRun.findFirst({
+            where: { standardRegister: register, status: { in: ['SUCCESS', 'NO_CHANGES'] } },
+            orderBy: { startedAt: 'desc' },
+          }),
+          this.prisma.standard.count({ where: { register, disappearedAt: null } }),
+          this.prisma.standard.count({ where: { register, disappearedAt: { not: null } } }),
+        ]);
+
+        return {
+          kind: 'standards' as const,
+          register,
+          lastRun,
+          lastSuccess,
+          lastVerified,
+          active,
+          disappeared,
+        };
+      }),
+    );
+
+    return [...laboratories, ...standards];
   }
 
   /**
@@ -77,7 +141,7 @@ export class ImportsService {
       },
     ];
 
-    return Promise.all(
+    const laboratories = await Promise.all(
       sources.map(async (s) => {
         // A run that found nothing to change still confirms the data is
         // current, so both outcomes count as a verification.
@@ -94,6 +158,27 @@ export class ImportsService {
         return { ...s, records, lastVerifiedAt: verified?.startedAt ?? null };
       }),
     );
+
+    // The standards catalogues answer the same question about a different
+    // table, so they are reported in the same shape rather than a parallel one
+    // the UI would have to special-case.
+    const standards = await Promise.all(
+      STANDARD_SOURCES.map(async (s) => {
+        const [verified, records] = await Promise.all([
+          this.prisma.importRun.findFirst({
+            where: { standardRegister: s.register, status: { in: ['SUCCESS', 'NO_CHANGES'] } },
+            orderBy: { startedAt: 'desc' },
+            select: { startedAt: true },
+          }),
+          this.prisma.standard.count({
+            where: { register: s.register, disappearedAt: null, deletedAt: null },
+          }),
+        ]);
+        return { ...s, records, lastVerifiedAt: verified?.startedAt ?? null };
+      }),
+    );
+
+    return [...laboratories, ...standards];
   }
 
   /** Records the source has stopped listing — kept, not deleted. */

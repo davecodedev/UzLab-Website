@@ -6,9 +6,13 @@ import { getAccessToken } from "@/lib/auth-client";
 
 type RunStatus = "SUCCESS" | "NO_CHANGES" | "REFUSED" | "FAILED";
 
+type SourceKey = "AKKRED" | "DEPSTAN" | "UZSTI" | "MGS";
+
 interface ImportRun {
   id: string;
-  register: "AKKRED" | "DEPSTAN";
+  /** Set for a laboratory-register run; null for a standards-catalogue one. */
+  register: "AKKRED" | "DEPSTAN" | null;
+  standardRegister: "UZSTI" | "MGS" | null;
   status: RunStatus;
   trigger: string;
   startedAt: string;
@@ -25,7 +29,9 @@ interface ImportRun {
 }
 
 interface RegisterSummary {
-  register: "AKKRED" | "DEPSTAN";
+  /** Which table the counts refer to — laboratories or standards. */
+  kind: "laboratories" | "standards";
+  register: SourceKey;
   lastRun: ImportRun | null;
   lastSuccess: ImportRun | null;
   /**
@@ -52,7 +58,14 @@ interface DisappearedRecord {
 const REGISTER_LABEL: Record<string, string> = {
   AKKRED: "O'zAkk (akkred.uz)",
   DEPSTAN: "Depstan (approval.depstan.uz)",
+  UZSTI: "UZSTI standards (uzsti.uz)",
+  MGS: "Interstate GOST catalogue (mgscatalog.by)",
 };
+
+/** A run belongs to whichever source it names; exactly one is ever set. */
+function runSource(run: ImportRun): SourceKey | null {
+  return run.register ?? run.standardRegister;
+}
 
 const STATUS_STYLE: Record<RunStatus, { bg: string; fg: string; label: string }> = {
   SUCCESS: { bg: "#DCFCE7", fg: "#166534", label: "Success" },
@@ -138,13 +151,15 @@ export default function AdminImportsPage() {
         {summary.map((s) => {
           const f = freshness(s.lastVerified ?? s.lastSuccess);
           return (
-            <div key={s.register} className="rounded-lg border border-gray-200 bg-white p-5">
+            <div key={`${s.kind}-${s.register}`} className="rounded-lg border border-gray-200 bg-white p-5">
               <div className="flex items-start justify-between gap-3">
                 <h2 className="font-semibold">{REGISTER_LABEL[s.register] ?? s.register}</h2>
                 {s.lastRun && <StatusPill status={s.lastRun.status} />}
               </div>
               <dl className="mt-4 grid grid-cols-2 gap-y-2 text-sm">
-                <dt className="text-gray-500">Active records</dt>
+                <dt className="text-gray-500">
+                  {s.kind === "standards" ? "Documents" : "Active records"}
+                </dt>
                 <dd className="text-right font-medium">{s.active.toLocaleString("ru-RU")}</dd>
 
                 <dt className="text-gray-500">Gone from source</dt>
@@ -173,7 +188,7 @@ export default function AdminImportsPage() {
           <thead>
             <tr className="border-b border-gray-200 text-left text-gray-500">
               <th className="py-2 pr-3 font-medium">Started</th>
-              <th className="py-2 pr-3 font-medium">Register</th>
+              <th className="py-2 pr-3 font-medium">Source</th>
               <th className="py-2 pr-3 font-medium">Status</th>
               <th className="py-2 pr-3 font-medium">Trigger</th>
               <th className="py-2 pr-3 text-right font-medium">Scraped</th>
@@ -187,7 +202,7 @@ export default function AdminImportsPage() {
             {runs.map((r) => (
               <tr key={r.id} className="border-b border-gray-100 align-top">
                 <td className="py-2 pr-3 whitespace-nowrap">{fmtDateTime(r.startedAt)}</td>
-                <td className="py-2 pr-3 whitespace-nowrap">{r.register}</td>
+                <td className="py-2 pr-3 whitespace-nowrap">{runSource(r) ?? "—"}</td>
                 <td className="py-2 pr-3">
                   <StatusPill status={r.status} />
                   {(r.message || r.warnings.length > 0) && (
@@ -236,7 +251,7 @@ export default function AdminImportsPage() {
                 <tr className="border-b border-gray-200 text-left text-gray-500">
                   <th className="py-2 pr-3 font-medium">Number</th>
                   <th className="py-2 pr-3 font-medium">Name</th>
-                  <th className="py-2 pr-3 font-medium">Register</th>
+                  <th className="py-2 pr-3 font-medium">Source</th>
                   <th className="py-2 pr-3 font-medium">Last seen</th>
                   <th className="py-2 pr-3 font-medium">Noticed missing</th>
                 </tr>
