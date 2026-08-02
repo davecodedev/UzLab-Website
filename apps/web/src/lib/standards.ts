@@ -156,3 +156,48 @@ export function statusTone(status: StandardStatus): { bg: string; fg: string } {
       return { bg: "var(--uz-bg-sunken)", fg: "var(--uz-text-muted)" };
   }
 }
+
+// --- The language a document is actually written in --------------------------
+//
+// A standard's title and scope are the source's own text, and each catalogue
+// publishes a given document in exactly one language: 5 721 of the UZSTI scopes
+// are Uzbek, 2 631 Russian, 469 English, and the whole GOST corpus is Russian.
+// There is no second version to switch to, so this text cannot follow the site's
+// language toggle the way our own wording does.
+//
+// What we can do is say which language it is in, so a reader who switched to
+// English and met Uzbek text knows they are looking at the document itself
+// rather than at a broken toggle.
+
+/** The catalogues' own spellings, normalised past the several apostrophes. */
+function normaliseLanguage(value: string | null): string {
+  return (value ?? "")
+    .toLowerCase()
+    .replace(/['‘’`ʻʼ]/g, "")
+    .trim();
+}
+
+/** Maps a source language onto one of ours, when it is one of ours. */
+export function sourceLanguageCode(value: string | null): "ru" | "uz" | "en" | null {
+  const text = normaliseLanguage(value);
+  if (!text) return null;
+  if (text.startsWith("ozbek") || text.startsWith("uzbek") || text === "uz") return "uz";
+  if (text.startsWith("рус") || text.startsWith("rus") || text === "ru") return "ru";
+  if (text.startsWith("english") || text.startsWith("ingliz") || text === "en") return "en";
+  return null;
+}
+
+/** French appears on three UZSTI records and nowhere else. */
+export function sourceLanguageKey(value: string | null): string | null {
+  const code = sourceLanguageCode(value);
+  if (code) return code;
+  return normaliseLanguage(value).startsWith("fren") ? "fr" : null;
+}
+
+/** "in Uzbek" / "на узбекском" — how to name the language of the text shown. */
+export const SOURCE_LANGUAGE_NAMES: Record<string, { ru: string; uz: string; en: string }> = {
+  uz: { ru: "на узбекском", uz: "o'zbek tilida", en: "in Uzbek" },
+  ru: { ru: "на русском", uz: "rus tilida", en: "in Russian" },
+  en: { ru: "на английском", uz: "ingliz tilida", en: "in English" },
+  fr: { ru: "на французском", uz: "fransuz tilida", en: "in French" },
+};

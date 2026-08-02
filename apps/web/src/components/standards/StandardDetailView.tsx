@@ -5,7 +5,9 @@ import { useLang, pick } from "@/lib/i18n";
 import { formatDateNumeric, formatNumber } from "@/lib/format";
 import {
   REGISTER_LABELS,
+  SOURCE_LANGUAGE_NAMES,
   STATUS_LABELS,
+  sourceLanguageKey,
   statusTone,
   type Standard,
 } from "@/lib/standards";
@@ -40,6 +42,20 @@ const T = {
     uz: "Bu hujjat endi amal qilmaydi. Unga havola qilishdan oldin manba katalogida nima bilan almashtirilganini tekshiring.",
     en: "This document is no longer in force. Check the source catalogue for what replaced it before citing it.",
   },
+  // Says why the document's own words did not change with the toggle. The
+  // catalogues publish each standard in one language only, so there is no
+  // translated version to show — the alternative to saying so is a reader
+  // concluding the language switch is broken.
+  sourceLanguageNote: {
+    ru: "Текст ниже — формулировка самого каталога. Документ опубликован только на одном языке, поэтому переключатель языка его не меняет.",
+    uz: "Quyidagi matn — katalogning o'z ifodasi. Hujjat faqat bitta tilda chop etilgan, shuning uchun til almashtirgich uni o'zgartirmaydi.",
+    en: "The text below is the catalogue's own wording. The document is published in one language only, so the language switch does not change it.",
+  },
+  openOriginal: {
+    ru: "Открыть оригинал",
+    uz: "Asl nusxani ochish",
+    en: "Open the original",
+  },
   detailPending: {
     ru: "Разработчик, технический комитет и область применения для этого документа ещё не загружены из каталога-источника.",
     uz: "Ushbu hujjat uchun ishlab chiquvchi, texnik qo'mita va qo'llanilish sohasi manba katalogidan hali yuklanmagan.",
@@ -53,6 +69,17 @@ export function StandardDetailView({ standard }: { standard: Standard }) {
   const { lang } = useLang();
   const tone = statusTone(standard.status);
   const stale = standard.status === "SUPERSEDED" || standard.status === "WITHDRAWN";
+
+  // The language the document itself is written in. The catalogues publish each
+  // standard once, in one language, so this text cannot follow the site's
+  // toggle — the most honest thing available is to say which language it is.
+  const sourceLanguage = sourceLanguageKey(standard.language);
+  const sourceLanguageName = sourceLanguage
+    ? pick(SOURCE_LANGUAGE_NAMES[sourceLanguage], lang)
+    : null;
+  const inAnotherLanguage = Boolean(sourceLanguage && sourceLanguage !== lang);
+  /** For screen readers and hyphenation, which need the real language. */
+  const sourceLanguageTag = sourceLanguage === "fr" ? "fr" : sourceLanguage;
 
   const rows: Row[] = [
     [pick(T.source, lang), pick(REGISTER_LABELS[standard.register], lang)],
@@ -99,7 +126,11 @@ export function StandardDetailView({ standard }: { standard: Standard }) {
       >
         {standard.designation}
       </h1>
-      <p className="mt-2 text-base leading-relaxed" style={{ color: "var(--uz-text)" }}>
+      <p
+        className="mt-2 text-base leading-relaxed"
+        style={{ color: "var(--uz-text)" }}
+        lang={sourceLanguageTag ?? undefined}
+      >
         {standard.title}
       </p>
 
@@ -157,15 +188,46 @@ export function StandardDetailView({ standard }: { standard: Standard }) {
 
       {standard.abstract && (
         <section className="mt-8">
-          <h2
-            className="text-xs font-semibold uppercase tracking-wider"
-            style={{ fontFamily: "var(--uz-font-display)", color: "var(--uz-text-faint)" }}
-          >
-            {pick(T.scope, lang)}
-          </h2>
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <h2
+              className="text-xs font-semibold uppercase tracking-wider"
+              style={{ fontFamily: "var(--uz-font-display)", color: "var(--uz-text-faint)" }}
+            >
+              {pick(T.scope, lang)}
+            </h2>
+            {/* Marks the language of the text itself, right where a reader who
+                switched the site language would otherwise be confused. */}
+            {sourceLanguageName && (
+              <span
+                className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                style={{ background: "var(--uz-bg-sunken)", color: "var(--uz-text-muted)" }}
+              >
+                {sourceLanguageName}
+              </span>
+            )}
+          </div>
+
+          {/* Only when it differs: saying "this is in English" to a reader
+              already reading English is noise. */}
+          {inAnotherLanguage && (
+            <p className="mt-2 text-xs leading-relaxed" style={{ color: "var(--uz-text-faint)" }}>
+              {pick(T.sourceLanguageNote, lang)}{" "}
+              <a
+                href={standard.sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="underline underline-offset-2"
+                style={{ color: "var(--uz-blue-600)" }}
+              >
+                {pick(T.openOriginal, lang)} ↗
+              </a>
+            </p>
+          )}
+
           <p
             className="mt-3 whitespace-pre-line text-sm leading-relaxed"
             style={{ color: "var(--uz-text)" }}
+            lang={sourceLanguageTag ?? undefined}
           >
             {standard.abstract}
           </p>
