@@ -480,6 +480,7 @@ model ContactSubmission {
 enum StandardRegister {
   MGS // mgscatalog.by — EASC interstate (GOST) catalogue, published from Belarus
   UZSTI // uzsti.uz — O'zbekiston Standartlar Instituti
+  ISO // iso.org open data — published under ODC-By v1.0, not scraped
 }
 
 // Each catalogue words its own state differently ("Введен впервые", "Заменен",
@@ -513,9 +514,14 @@ model Standard {
   /// The catalogue's own wording, kept verbatim beside the mapped enum.
   statusLabel String?
 
-  /// ICS classification: "75" and "Добыча и переработка нефти, газа...".
+  /// Top-level ICS group — "75". Kept two-digit across all sources so one
+  /// filter works over the whole catalogue.
   icsCode  String?
+  /// The source's own wording for that group, in the source's own language.
   icsLabel String?
+  /// Full ICS codes as the source gives them — "21.060.10". ISO assigns
+  /// several per document; the other catalogues publish only the group.
+  icsCodes String[] @default([])
   /// The catalogue's own grouping — "Milliy standartlar", "ГОСТ - межгосударственные стандарты".
   category String?
   language String?
@@ -557,4 +563,29 @@ model Standard {
   @@index([disappearedAt])
   @@index([deletedAt])
   @@index([detailFetchedAt])
+}
+
+/// The International Classification for Standards, from ISO's open data.
+///
+/// A reference table rather than columns on Standard: the same 40 top-level
+/// groups are used by every catalogue we hold, each in its own wording, and
+/// this is the one canonical naming for them. Three levels deep — "21",
+/// "21.060", "21.060.10" — linked by `parent`.
+///
+/// Sourced from the iso_ics dataset, ODC-By v1.0. See ATTRIBUTION in the
+/// standards catalogue UI.
+model IcsClass {
+  code   String  @id
+  parent String?
+
+  titleEn String
+  scopeEn String?
+
+  /// 0 for "21", 1 for "21.060", 2 for "21.060.10".
+  level Int
+
+  updatedAt DateTime @updatedAt
+
+  @@index([parent])
+  @@index([level])
 }

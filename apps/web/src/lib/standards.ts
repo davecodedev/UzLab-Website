@@ -11,7 +11,7 @@
 
 export const STANDARDS_PATH = "/standards";
 
-export type StandardRegister = "MGS" | "UZSTI";
+export type StandardRegister = "MGS" | "UZSTI" | "ISO";
 
 export type StandardStatus =
   | "IN_FORCE"
@@ -130,7 +130,27 @@ export const REGISTER_LABELS: Record<StandardRegister, { ru: string; uz: string;
     uz: "Davlatlararo standartlar (GOST)",
     en: "Interstate standards (GOST)",
   },
+  ISO: {
+    ru: "Международные стандарты (ISO)",
+    uz: "Xalqaro standartlar (ISO)",
+    en: "International standards (ISO)",
+  },
 };
+
+/**
+ * Required by the licence, not offered as a courtesy. The ISO datasets are
+ * published under ODC-By v1.0, whose one condition is attribution, and ISO
+ * specifies the wording. It stays on the page for as long as the records do.
+ */
+export const ISO_ATTRIBUTION = {
+  datasets: [
+    { id: "iso_deliverables_metadata", label: "ISO Deliverables Metadata" },
+    { id: "iso_ics", label: "International Classification for Standards (ICS)" },
+  ],
+  openDataUrl: "https://www.iso.org/open-data.html",
+  licenceUrl: "https://opendatacommons.org/licenses/by/1-0/",
+  licenceName: "ODC Attribution License (ODC-By) v1.0",
+} as const;
 
 export const STATUS_LABELS: Record<StandardStatus, { ru: string; uz: string; en: string }> = {
   IN_FORCE: { ru: "Действует", uz: "Amalda", en: "In force" },

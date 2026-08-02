@@ -45,4 +45,4 @@ export const REGISTER_SITES = [
  * catalogue would claim an accreditation register as its own.
  */
 export const LABORATORY_SOURCES = ["AKKRED", "DEPSTAN"] as const;
-export const STANDARD_SOURCES = ["UZSTI", "MGS"] as const;
+export const STANDARD_SOURCES = ["UZSTI", "MGS", "ISO"] as const;

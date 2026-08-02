@@ -1,4 +1,5 @@
 import { StandardsApp } from "@/components/standards/StandardsApp";
+import { IsoAttribution } from "@/components/standards/IsoAttribution";
 import { DataProvenance } from "@/components/DataProvenance";
 import { PROVENANCE_PATH, STANDARD_SOURCES, type ProvenanceSource } from "@/lib/provenance";
 import { api } from "@/lib/api";
@@ -21,6 +22,7 @@ export default async function StandardsPage() {
     <>
       <StandardsApp />
       <DataProvenance sources={provenance} only={STANDARD_SOURCES} kind="standards" />
+      <IsoAttribution />
     </>
   );
 }

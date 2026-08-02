@@ -20,6 +20,12 @@ const STANDARD_SOURCES = [
     url: 'https://mgscatalog.by/',
     refresh: 'weekly',
   },
+  {
+    register: StandardRegister.ISO,
+    name: 'International Organization for Standardization (ISO Open Data)',
+    url: 'https://www.iso.org/open-data.html',
+    refresh: 'daily',
+  },
 ] as const;
 
 @Injectable()

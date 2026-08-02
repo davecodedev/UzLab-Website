@@ -33,7 +33,9 @@
     "import:uzsti": "ts-node --project tsconfig.scripts.json --transpile-only scripts/import-uzsti-standards.ts",
     "import:mgs": "ts-node --project tsconfig.scripts.json --transpile-only scripts/import-mgs-standards.ts",
     "fetch:mgs-details": "ts-node --project tsconfig.scripts.json --transpile-only scripts/fetch-mgs-details.ts",
-    "refresh:standards": "ts-node --project tsconfig.scripts.json --transpile-only scripts/refresh-standards.ts"
+    "refresh:standards": "ts-node --project tsconfig.scripts.json --transpile-only scripts/refresh-standards.ts",
+    "import:iso": "ts-node --project tsconfig.scripts.json --transpile-only scripts/import-iso-standards.ts",
+    "import:ics": "ts-node --project tsconfig.scripts.json --transpile-only scripts/import-ics-classes.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
