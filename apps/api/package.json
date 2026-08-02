@@ -32,7 +32,8 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "import:uzsti": "ts-node --project tsconfig.scripts.json --transpile-only scripts/import-uzsti-standards.ts",
     "import:mgs": "ts-node --project tsconfig.scripts.json --transpile-only scripts/import-mgs-standards.ts",
-    "fetch:mgs-details": "ts-node --project tsconfig.scripts.json --transpile-only scripts/fetch-mgs-details.ts"
+    "fetch:mgs-details": "ts-node --project tsconfig.scripts.json --transpile-only scripts/fetch-mgs-details.ts",
+    "refresh:standards": "ts-node --project tsconfig.scripts.json --transpile-only scripts/refresh-standards.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

@@ -41,11 +41,14 @@ export interface StandardRunOptions {
   force?: boolean;
 }
 
-/**
- * The catalogues are large and the write is row-by-row, so progress is printed
- * rather than left silent for twenty minutes.
- */
-const PROGRESS_EVERY = 500;
+/** How often to report progress; a full catalogue write is otherwise silent. */
+const PROGRESS_EVERY = 2000;
+
+/** Rows per createMany. Large enough to matter, small enough to stay readable. */
+const CREATE_CHUNK = 500;
+
+/** Updates in flight at once — bounded by the connection pool, not politeness. */
+const UPDATE_CONCURRENCY = 20;
 
 /**
  * Builds the folded, script-neutral key stored in `Standard.searchText`.
@@ -143,43 +146,67 @@ export async function runStandardImport(
     }
 
     const now = new Date();
-    let created = 0;
-    let updated = 0;
+
+    // The whole catalogue's keys in one query, so deciding insert-or-update
+    // costs no round trips. A per-record `findUnique` here is what made the
+    // first production import take hours: the interstate catalogue is 32 899
+    // documents, and at proxy latency two queries each is most of a day.
+    const existingRows = await prisma.standard.findMany({
+      where: { register },
+      select: { id: true, sourceId: true, disappearedAt: true },
+    });
+    const existing = new Map(existingRows.map((r) => [r.sourceId, r]));
+
+    const toCreate: Prisma.StandardCreateManyInput[] = [];
+    const toUpdate: { id: string; data: Prisma.StandardUpdateInput }[] = [];
     let reappeared = 0;
-    let done = 0;
 
     for (const rec of result.records) {
       const searchText = buildStandardSearchKey(rec.data.designation, rec.data);
-      const existing = await prisma.standard.findUnique({
-        where: { register_sourceId: { register, sourceId: rec.sourceId } },
-        select: { id: true, disappearedAt: true },
-      });
+      const found = existing.get(rec.sourceId);
 
-      if (existing) {
-        if (existing.disappearedAt) reappeared++;
-        await prisma.standard.update({
-          where: { id: existing.id },
+      if (found) {
+        if (found.disappearedAt) reappeared++;
+        // Keep the established slug — it is already in published URLs.
+        toUpdate.push({
+          id: found.id,
           data: { ...rec.data, searchText, lastSeenAt: now, disappearedAt: null },
         });
-        updated++;
       } else {
-        await prisma.standard.create({
-          data: {
-            ...rec.data,
-            register,
-            sourceId: rec.sourceId,
-            slug: rec.slug,
-            searchText,
-            lastSeenAt: now,
-          },
+        toCreate.push({
+          ...rec.data,
+          register,
+          sourceId: rec.sourceId,
+          slug: rec.slug,
+          searchText,
+          lastSeenAt: now,
         });
-        created++;
-      }
-
-      if (++done % PROGRESS_EVERY === 0) {
-        console.log(`  written ${done}/${result.records.length}`);
       }
     }
+
+    for (let i = 0; i < toCreate.length; i += CREATE_CHUNK) {
+      await prisma.standard.createMany({ data: toCreate.slice(i, i + CREATE_CHUNK) });
+      console.log(`  created ${Math.min(i + CREATE_CHUNK, toCreate.length)}/${toCreate.length}`);
+    }
+
+    // Updates cannot be batched into one statement the way inserts can — each
+    // row gets different values — so they go out concurrently instead. The
+    // limit is about not opening more connections than the pool holds, not
+    // about load: this work is waiting on the network, not on Postgres.
+    for (let i = 0; i < toUpdate.length; i += UPDATE_CONCURRENCY) {
+      await Promise.all(
+        toUpdate
+          .slice(i, i + UPDATE_CONCURRENCY)
+          .map((u) => prisma.standard.update({ where: { id: u.id }, data: u.data })),
+      );
+      const done = Math.min(i + UPDATE_CONCURRENCY, toUpdate.length);
+      if (done % PROGRESS_EVERY < UPDATE_CONCURRENCY) {
+        console.log(`  updated ${done}/${toUpdate.length}`);
+      }
+    }
+
+    const created = toCreate.length;
+    const updated = toUpdate.length;
 
     // Anything in this catalogue we did not see is stamped, never deleted: a
     // withdrawn standard is still the document an old accreditation cites.
