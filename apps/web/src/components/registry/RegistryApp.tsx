@@ -406,6 +406,19 @@ export function RegistryApp({ laboratories }: { laboratories: Laboratory[] }) {
 
   const summarySentence = useMemo(() => {
     if (filtered.length === 0) return t("noResults", lang);
+
+    // Without accreditation data every count here would read as zero — "0
+    // accredited" states something false rather than declining to state it.
+    // Region is public, so that much can still be said.
+    if (restricted) {
+      const regions = regionsWithData.length;
+      return {
+        ru: `${filtered.length} записей${regions ? ` в ${regions} регионах` : ""}`,
+        uz: `${filtered.length} ta yozuv${regions ? ` ${regions} ta hududda` : ""}`,
+        en: `${filtered.length} records${regions ? ` across ${regions} regions` : ""}`,
+      }[lang];
+    }
+
     const accredited = statusCounts.ACCREDITED ?? 0;
     const labs = filtered.filter((l) => l.isLaboratory).length;
     if (regionsWithData.length === 0) {
@@ -421,7 +434,7 @@ export function RegistryApp({ laboratories }: { laboratories: Laboratory[] }) {
       uz: `${filtered.length} ta yozuv ${regionsWithData.length} ta hududda, eng ko'pi «${top.label}» (${top.count}) — laboratoriyalar: ${labs}, akkreditatsiya qilingan: ${accredited}`,
       en: `${filtered.length} records across ${regionsWithData.length} regions, most in "${top.label}" (${top.count}) — laboratories: ${labs}, accredited: ${accredited}`,
     }[lang];
-  }, [filtered, regionsWithData, statusCounts, lang]);
+  }, [filtered, regionsWithData, statusCounts, lang, restricted]);
 
   const applyFilters = useCallback((f: RegistryFilters) => {
     setFilters(f);
@@ -551,6 +564,7 @@ export function RegistryApp({ laboratories }: { laboratories: Laboratory[] }) {
             sentence={summarySentence}
             statusCounts={statusCounts}
             registerRows={registerRows}
+            restricted={restricted}
           />
 
           <div className="reg-print-hide mt-5 flex flex-wrap items-center justify-between gap-3">
@@ -1014,12 +1028,16 @@ function SummaryCard({
   sentence,
   statusCounts,
   registerRows,
+  restricted,
 }: {
   lang: Lang;
   total: number;
   sentence: string;
   statusCounts: Record<string, number>;
   registerRows: RegisterRow[];
+  /** Accreditation status and register are member fields; without them these
+   *  breakdowns would all read zero, which states something untrue. */
+  restricted: boolean;
 }) {
   const base = Math.max(1, total);
   return (
@@ -1041,7 +1059,7 @@ function SummaryCard({
           <p className="mt-2 max-w-[440px] text-sm leading-relaxed" style={{ color: "rgba(255,255,255,0.9)" }}>
             {sentence}
           </p>
-          {registerRows.length > 0 && (
+          {!restricted && registerRows.length > 0 && (
             <div className="mt-4">
               <p
                 className="reg-mono text-[10px] font-semibold uppercase tracking-[0.08em]"
@@ -1065,7 +1083,8 @@ function SummaryCard({
           )}
         </div>
         <div className="grid grid-cols-2 gap-x-8 gap-y-4 md:flex-none">
-          {STATUS_ORDER.map((s) => {
+          {!restricted &&
+            STATUS_ORDER.map((s) => {
             const count = statusCounts[s] ?? 0;
             const pct = Math.min(100, (count / base) * 100);
             return (
