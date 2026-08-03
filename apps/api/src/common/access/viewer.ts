@@ -74,6 +74,13 @@ export const PUBLIC_LABORATORY_FIELDS = [
   'city',
   'address',
   'source',
+  // The registry number, which register it came from, and what kind of body it
+  // is. Enough to identify a record and tell a testing laboratory from a
+  // certification body; still short of the accreditation status, validity,
+  // scope and contacts that a membership buys.
+  'accreditationNumber',
+  'register',
+  'bodyType',
 ] as const;
 
 export type PublicLaboratoryField = (typeof PUBLIC_LABORATORY_FIELDS)[number];

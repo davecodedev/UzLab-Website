@@ -625,9 +625,9 @@ export function RegistryApp({ laboratories }: { laboratories: Laboratory[] }) {
             {filtered.length === 0 ? (
               <EmptyState lang={lang} onClear={clearAll} />
             ) : view === "table" ? (
-              <TableView lang={lang} laboratories={filtered} />
+              <TableView lang={lang} laboratories={filtered} restricted={restricted} />
             ) : view === "cards" ? (
-              <CardsView lang={lang} laboratories={filtered} />
+              <CardsView lang={lang} laboratories={filtered} restricted={restricted} />
             ) : view === "map" ? (
               <MapView rows={regionRows} maxCount={maxRegionCount} onSelect={(v) => updateFilter("region", v)} />
             ) : (
@@ -1147,7 +1147,17 @@ function StatusPill({ status, lang }: { status: string; lang: Lang }) {
   );
 }
 
-function TableView({ lang, laboratories }: { lang: Lang; laboratories: Laboratory[] }) {
+function TableView({
+  lang,
+  laboratories,
+  restricted,
+}: {
+  lang: Lang;
+  laboratories: Laboratory[];
+  /** Without a membership the detail page adds nothing, so the name does not
+   *  pretend to lead anywhere. */
+  restricted: boolean;
+}) {
   return (
     <div className="mt-4 overflow-x-auto rounded-[14px] bg-white" style={{ border: "1px solid var(--reg-border)" }}>
       <table className="w-full min-w-[1020px] border-collapse text-sm">
@@ -1171,9 +1181,19 @@ function TableView({ lang, laboratories }: { lang: Lang; laboratories: Laborator
                 {lab.accreditationNumber ?? "—"}
               </td>
               <td className="px-4 py-3 align-top">
-                <Link href={`/laboratories/${lab.slug}`} className="font-medium hover:underline" style={{ color: "var(--reg-ink)" }}>
-                  {lab.name}
-                </Link>
+                {restricted ? (
+                  <span className="font-medium" style={{ color: "var(--reg-ink)" }}>
+                    {lab.name}
+                  </span>
+                ) : (
+                  <Link
+                    href={`/laboratories/${lab.slug}`}
+                    className="font-medium hover:underline"
+                    style={{ color: "var(--reg-ink)" }}
+                  >
+                    {lab.name}
+                  </Link>
+                )}
                 {lab.legalEntityName && lab.legalEntityName !== lab.name && (
                   <div className="mt-0.5 text-xs" style={{ color: "var(--reg-gray-3)" }}>
                     {lab.legalEntityName}
@@ -1234,16 +1254,23 @@ function CardRow({ label, value, mono = false }: { label: string; value: string;
   );
 }
 
-function CardsView({ lang, laboratories }: { lang: Lang; laboratories: Laboratory[] }) {
+function CardsView({
+  lang,
+  laboratories,
+  restricted,
+}: {
+  lang: Lang;
+  laboratories: Laboratory[];
+  restricted: boolean;
+}) {
   return (
     <div className="mt-4 grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))" }}>
-      {laboratories.map((lab) => (
-        <Link
-          key={lab.id}
-          href={`/laboratories/${lab.slug}`}
-          className="reg-card block rounded-[14px] bg-white p-4 transition-colors"
-          style={{ border: "1px solid var(--reg-border)" }}
-        >
+      {laboratories.map((lab) => {
+        // The whole card is the link when there is somewhere worth going. For a
+        // restricted viewer the detail page adds nothing, so it is a plain box
+        // rather than something that looks clickable and disappoints.
+        const body = (
+          <>
           <div className="flex items-center justify-between gap-2">
             <span className="reg-mono text-xs font-semibold" style={{ color: "var(--reg-blue)" }}>
               {lab.accreditationNumber ?? "—"}
@@ -1279,8 +1306,22 @@ function CardsView({ lang, laboratories }: { lang: Lang; laboratories: Laborator
             {lab.phone && <CardRow label={t("colPhone", lang)} value={lab.phone} mono />}
             {lab.email && <CardRow label={t("colEmail", lang)} value={lab.email} />}
           </dl>
-        </Link>
-      ))}
+          </>
+        );
+
+        const className = `block rounded-[14px] bg-white p-4 transition-colors${restricted ? "" : " reg-card"}`;
+        const style = { border: "1px solid var(--reg-border)" };
+
+        return restricted ? (
+          <div key={lab.id} className={className} style={style}>
+            {body}
+          </div>
+        ) : (
+          <Link key={lab.id} href={`/laboratories/${lab.slug}`} className={className} style={style}>
+            {body}
+          </Link>
+        );
+      })}
     </div>
   );
 }
