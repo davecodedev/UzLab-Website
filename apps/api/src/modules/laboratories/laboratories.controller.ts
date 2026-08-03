@@ -37,6 +37,8 @@ import type { AuthenticatedUser } from '../../common/types/authenticated-request
 import { RolesGuard } from '../../common/guards/roles.guard.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import { UserRole } from '@prisma/client';
+import { Throttle } from '@nestjs/throttler';
+import { THROTTLE_BULK, THROTTLE_SEARCH } from '../../common/throttling.js';
 
 @Controller('laboratories')
 export class LaboratoriesController {
@@ -48,6 +50,7 @@ export class LaboratoriesController {
   // Public, but not the same for everyone: the guard reads a token when one is
   // sent and lets the request through when it is not, so the service can decide
   // how much of each record to return.
+  @Throttle({ default: THROTTLE_BULK })
   @UseGuards(OptionalJwtAuthGuard)
   @Get()
   async list(
@@ -71,6 +74,7 @@ export class LaboratoriesController {
    * matching set back is enough to intersect with the other filters, and it
    * keeps this response tiny regardless of how many documents matched.
    */
+  @Throttle({ default: THROTTLE_SEARCH })
   @Get('search/keywords')
   searchKeywords(@Query('q') q?: string) {
     return this.laboratoriesService.searchKeywords(q ?? '');

@@ -7,6 +7,9 @@ import { MediaModule } from './modules/media/media.module.js';
 import { LaboratoriesModule } from './modules/laboratories/laboratories.module.js';
 import { StandardsModule } from './modules/standards/standards.module.js';
 import { PaymentsModule } from './modules/payments/payments.module.js';
+import { ThrottlingModule } from './common/throttling.js';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { SearchModule } from './modules/search/search.module.js';
 import { HealthModule } from './modules/health/health.module.js';
 import { ImportsModule } from './modules/imports/imports.module.js';
@@ -27,10 +30,12 @@ import { ClaimsModule } from './modules/claims/claims.module.js';
     LaboratoriesModule,
     StandardsModule,
     PaymentsModule,
+    ThrottlingModule,
     SearchModule,
     HealthModule,
     ImportsModule,
     ClaimsModule,
   ],
+  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

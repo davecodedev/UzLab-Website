@@ -18,6 +18,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../../common/guards/roles.guard.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
+import { SkipThrottle } from '@nestjs/throttler';
 
 @Controller('payments')
 export class PaymentsController {
@@ -62,6 +63,7 @@ export class PaymentsController {
    * exception filter.
    */
   @HttpCode(200)
+  @SkipThrottle()
   @Post('payme')
   async paymeCallback(
     @Headers('authorization') auth: string | undefined,
@@ -87,12 +89,14 @@ export class PaymentsController {
 
   // Click posts form-encoded bodies to two separate paths.
   @HttpCode(200)
+  @SkipThrottle()
   @Post('click/prepare')
   clickPrepare(@Body() body: ClickCallback) {
     return this.click.prepare(body);
   }
 
   @HttpCode(200)
+  @SkipThrottle()
   @Post('click/complete')
   clickComplete(@Body() body: ClickCallback) {
     return this.click.complete(body);
