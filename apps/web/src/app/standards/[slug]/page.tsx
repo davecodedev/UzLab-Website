@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { StandardDetailView } from "@/components/standards/StandardDetailView";
+import { ServiceNotice } from "@/components/ServiceNotice";
 import { api, ApiError } from "@/lib/api";
 import type { Standard } from "@/lib/standards";
 
@@ -17,6 +18,7 @@ export default async function StandardPage({
     // A missing document is a 404, not a 500; anything else is a real fault and
     // should surface rather than be disguised as "not found".
     if (err instanceof ApiError && err.status === 404) notFound();
+    if (err instanceof ApiError) return <ServiceNotice />;
     throw err;
   }
 

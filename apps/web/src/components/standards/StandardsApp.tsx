@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { ServiceNotice } from "@/components/ServiceNotice";
 import { useLang, pick } from "@/lib/i18n";
 import { formatNumber } from "@/lib/format";
 import {
@@ -135,6 +136,10 @@ export function StandardsApp() {
     setText("");
     setQuery(EMPTY_QUERY);
   }, []);
+
+  // Nothing ever loaded and the service is unreachable: show the same notice
+  // the registry does rather than an empty catalogue with a filter sidebar.
+  if (failed && !result) return <ServiceNotice />;
 
   const totalPages = result ? Math.max(1, Math.ceil(result.total / result.pageSize)) : 1;
 

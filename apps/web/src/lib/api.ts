@@ -17,15 +17,33 @@ export function apiUrl(path: string): string {
   return `${API_URL}/api${path}`;
 }
 
+/**
+ * A request that has not answered by now is not going to. Without this a page
+ * whose data is unavailable does not fail — it hangs, holding the render open
+ * until something further upstream gives up, which is a worse experience than
+ * an honest "this is unavailable". Long enough for a cold API container, short
+ * enough that nobody sits watching a blank page.
+ */
+const TIMEOUT_MS = 8_000;
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${API_URL}/api${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-    cache: "no-store",
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/api${path}`, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options.headers,
+      },
+      cache: "no-store",
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+  } catch (err) {
+    // Status 0 means the request never reached the API — offline, refused, or
+    // timed out. Callers distinguish it from a real HTTP error.
+    const reason = err instanceof Error && err.name === "TimeoutError" ? "timed out" : "unreachable";
+    throw new ApiError(0, `The service is ${reason}.`);
+  }
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ message: res.statusText }));
