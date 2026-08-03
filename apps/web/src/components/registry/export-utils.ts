@@ -138,7 +138,7 @@ function exportColumns(lab: Laboratory, lang: Lang): Record<string, string> {
     // Member-added entries have no register but are still labelled, so an
     // exported row says where it came from rather than leaving the cell blank.
     [headers.register]:
-      lab.register || isSelfRegistered(lab) ? registerLabel(lab.register, lang, lab.source) : "",
+      lab.register || isSelfRegistered(lab) ? registerLabel(lab.register ?? null, lang, lab.source) : "",
     [headers.bodyType]: lab.bodyType ? bodyTypeLabel(lab.bodyType, lang) : (lab.bodyTypeLabel ?? ""),
     [headers.taxId]: lab.taxId ?? "",
     [headers.legalEntity]: lab.legalEntityName ?? "",
@@ -152,14 +152,14 @@ function exportColumns(lab: Laboratory, lang: Lang): Record<string, string> {
     [headers.phone]: lab.phone ?? "",
     [headers.email]: lab.email ?? "",
     [headers.website]: lab.website ?? "",
-    [headers.status]: statusLabel(lab.accreditationStatus, lang),
+    [headers.status]: statusLabel(lab.accreditationStatus ?? "UNKNOWN", lang),
     // The source register's own wording, verbatim — never translated.
     [headers.registerStatusLabel]: lab.registerStatusLabel ?? "",
     [headers.statusDate]: fmtDate(lab.statusDate),
     [headers.body]: lab.accreditationBody ?? "",
     [headers.accreditedFrom]: fmtDate(lab.accreditationDate),
     [headers.reAccredited]: fmtDate(lab.reAccreditationDate),
-    [headers.until]: fmtDate(lab.accreditedUntil),
+    [headers.until]: fmtDate(lab.accreditedUntil ?? null),
     [headers.certificateUrl]: lab.certificateUrl ?? "",
     [headers.scopeUrl]: lab.scopeUrl ?? "",
   };

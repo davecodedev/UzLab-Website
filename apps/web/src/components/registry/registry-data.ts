@@ -18,37 +18,46 @@ import type { Lang } from "@/lib/i18n";
 // across the register. It is fetched only on the detail page.
 // ---------------------------------------------------------------------------
 
+/**
+ * A registry record as the browser receives it.
+ *
+ * Only the first few fields always arrive. The rest are sent to signed-in
+ * members with an active subscription and withheld from everyone else, so they
+ * are optional in the type — the compiler is the thing that stops the UI from
+ * assuming a field it may not have been given.
+ */
 export interface Laboratory {
   id: string;
   name: string;
   slug: string;
-  fields: string[];
-  accreditationNumber: string | null;
-  accreditationBody: string | null;
-  accreditationStatus: string;
-  accreditedUntil: string | null;
-  taxId: string | null;
   region: string | null;
   city: string | null;
   address: string | null;
-  phone: string | null;
-  email: string | null;
-  website: string | null;
-  description: string | null;
-  isUzLabMember: boolean;
   source: string;
+
+  fields?: string[];
+  accreditationNumber?: string | null;
+  accreditationBody?: string | null;
+  accreditationStatus?: string;
+  accreditedUntil?: string | null;
+  taxId?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  website?: string | null;
+  description?: string | null;
+  isUzLabMember?: boolean;
 
   // National-register detail
   /** NationalRegister enum — AKKRED (akkred.uz) or DEPSTAN (approval.depstan.uz). */
-  register: string | null;
+  register?: string | null;
   /** The register's own status wording, before mapping to `accreditationStatus`. */
-  registerStatusLabel: string | null;
-  bodyType: string | null;
-  bodyTypeLabel: string | null;
-  isLaboratory: boolean;
-  legalEntityName: string | null;
-  legalEntityAddress: string | null;
-  supervisorName: string | null;
+  registerStatusLabel?: string | null;
+  bodyType?: string | null;
+  bodyTypeLabel?: string | null;
+  isLaboratory?: boolean;
+  legalEntityName?: string | null;
+  legalEntityAddress?: string | null;
+  supervisorName?: string | null;
   standard: string | null;
   accreditationDate: string | null;
   reAccreditationDate: string | null;
@@ -85,9 +94,9 @@ export interface RegistryFilters {
   regNo: string;
   orgName: string;
   /** NationalRegister — which national register a record came from. */
-  register: string;
+  register?: string;
   /** ConformityBodyType — the register's own body-type discriminator. */
-  bodyType: string;
+  bodyType?: string;
   region: string;
   status: string;
   /** "RD — field of accreditation": matches the real `directions` sectors. */
@@ -97,7 +106,7 @@ export interface RegistryFilters {
    * (e.g. "O'z DSt ISO/IEC 17025:2019"). */
   standardDoc: string;
   /** STIR / tax identification number — real `taxId` column. */
-  taxId: string;
+  taxId?: string;
   /** "Stakeholder Registry": matches real contact columns. */
   stakeholder: string;
   /** Restrict to laboratories, excluding certification/inspection bodies. */

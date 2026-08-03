@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Delete,
   Get,
   Param,
@@ -24,9 +25,15 @@ import { LaboratoriesService } from './laboratories.service.js';
 import { ListLaboratoriesDto } from './dto/list-laboratories.dto.js';
 import { CreateLaboratoryDto } from './dto/create-laboratory.dto.js';
 import { UpdateLaboratoryDto } from './dto/update-laboratory.dto.js';
-import { SubmitLaboratoryDto, ReviewSubmissionDto } from './dto/submit-laboratory.dto.js';
+import {
+  SubmitLaboratoryDto,
+  ReviewSubmissionDto,
+} from './dto/submit-laboratory.dto.js';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard.js';
+import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard.js';
+import { seesEverything } from '../../common/access/viewer.js';
+import type { AuthenticatedUser } from '../../common/types/authenticated-request.js';
 import { RolesGuard } from '../../common/guards/roles.guard.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import { UserRole } from '@prisma/client';
@@ -38,9 +45,17 @@ export class LaboratoriesController {
     private readonly documents: LaboratoryDocumentsService,
   ) {}
 
+  // Public, but not the same for everyone: the guard reads a token when one is
+  // sent and lets the request through when it is not, so the service can decide
+  // how much of each record to return.
+  @UseGuards(OptionalJwtAuthGuard)
   @Get()
-  list(@Query() query: ListLaboratoriesDto) {
-    return this.laboratoriesService.list(query);
+  async list(
+    @Query() query: ListLaboratoriesDto,
+    @CurrentUser() user?: AuthenticatedUser,
+  ) {
+    const viewer = await this.laboratoriesService.resolveViewer(user);
+    return this.laboratoriesService.list(query, viewer);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -67,7 +82,10 @@ export class LaboratoriesController {
 
   @UseGuards(JwtAuthGuard)
   @Post('submissions')
-  submit(@CurrentUser() user: { id: string }, @Body() dto: SubmitLaboratoryDto) {
+  submit(
+    @CurrentUser() user: { id: string },
+    @Body() dto: SubmitLaboratoryDto,
+  ) {
     return this.laboratoriesService.submit(user.id, dto);
   }
 
@@ -78,7 +96,9 @@ export class LaboratoriesController {
    */
   @UseGuards(JwtAuthGuard)
   @Post('submissions/analyze')
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_DOCUMENT_BYTES } }))
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: MAX_DOCUMENT_BYTES } }),
+  )
   analyzeDocument(@UploadedFile() file: UploadedFileType) {
     return this.documents.analyze(file);
   }
@@ -86,7 +106,9 @@ export class LaboratoriesController {
   /** Attaches a document to a laboratory the member has already submitted. */
   @UseGuards(JwtAuthGuard)
   @Post('submissions/:id/documents/:kind')
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_DOCUMENT_BYTES } }))
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: MAX_DOCUMENT_BYTES } }),
+  )
   async attachDocument(
     @CurrentUser() user: { id: string },
     @Param('id') id: string,
@@ -97,19 +119,29 @@ export class LaboratoriesController {
     return this.documents.attach(id, kind, file, user.id);
   }
 
+  // The certificate and scope PDFs are the record in full — handing them to
+  // anyone with an id would make the field limits above decorative.
+  @UseGuards(OptionalJwtAuthGuard)
   @Get(':id/documents/:kind')
   async downloadDocument(
     @Param('id') id: string,
     @Param('kind') kind: LaboratoryDocumentKind,
     @Res() res: Response,
+    @CurrentUser() user?: AuthenticatedUser,
   ) {
+    const viewer = await this.laboratoriesService.resolveViewer(user);
+    if (!seesEverything(viewer)) {
+      throw new ForbiddenException(
+        'An active membership is required to open this document.',
+      );
+    }
     const doc = await this.documents.download(id, kind);
     res.setHeader('Content-Type', doc.mimeType);
     res.setHeader('Content-Length', String(doc.sizeBytes));
     // `inline` so the browser previews it rather than forcing a download.
     res.setHeader(
       'Content-Disposition',
-      `inline; filename="${doc.filename.replace(/[^\w.\-]/g, '_')}"`,
+      `inline; filename="${doc.filename.replace(/[^\w.-]/g, '_')}"`,
     );
     res.end(Buffer.from(doc.data));
   }
@@ -134,9 +166,14 @@ export class LaboratoriesController {
     return this.laboratoriesService.reviewSubmission(id, dto);
   }
 
+  @UseGuards(OptionalJwtAuthGuard)
   @Get(':slug')
-  getBySlug(@Param('slug') slug: string) {
-    return this.laboratoriesService.getBySlug(slug);
+  async getBySlug(
+    @Param('slug') slug: string,
+    @CurrentUser() user?: AuthenticatedUser,
+  ) {
+    const viewer = await this.laboratoriesService.resolveViewer(user);
+    return this.laboratoriesService.getBySlug(slug, viewer);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

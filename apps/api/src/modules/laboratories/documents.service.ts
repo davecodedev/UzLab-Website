@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { LaboratoryDocumentKind } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
 
@@ -41,14 +45,18 @@ export class LaboratoryDocumentsService {
     const parser = new PDFParse({ data: buffer });
     try {
       const { text } = await parser.getText();
-      return (text ?? '').replace(/\r/g, '').replace(/[ \t]+/g, ' ').trim();
+      return (text ?? '')
+        .replace(/\r/g, '')
+        .replace(/[ \t]+/g, ' ')
+        .trim();
     } finally {
       await parser.destroy?.();
     }
   }
 
   private assertPdf(file: UploadedFile) {
-    if (!file?.buffer?.length) throw new BadRequestException('No file was uploaded.');
+    if (!file?.buffer?.length)
+      throw new BadRequestException('No file was uploaded.');
     if (file.size > MAX_DOCUMENT_BYTES) {
       throw new BadRequestException(
         `File is ${(file.size / 1024 / 1024).toFixed(1)} MB; the limit is ${MAX_DOCUMENT_BYTES / 1024 / 1024} MB.`,
@@ -99,10 +107,18 @@ export class LaboratoryDocumentsService {
     // (scope) in their body — a certificate states what it covers — so testing
     // for that word first classifies certificates as scopes. Only the phrase
     // "TO'G'RISIDA GUVOHNOMA" ("certificate of…") is unique to the certificate.
-    if (/TO['`’ʻ]?G['`’ʻ]?RISIDA\s+GUVOHNOMA|ТЎҒРИСИДА\s+ГУВОҲНОМА|СЕРТИФИКАТ\s+АККРЕДИТАЦИИ/.test(head)) {
+    if (
+      /TO['`’ʻ]?G['`’ʻ]?RISIDA\s+GUVOHNOMA|ТЎҒРИСИДА\s+ГУВОҲНОМА|СЕРТИФИКАТ\s+АККРЕДИТАЦИИ/.test(
+        head,
+      )
+    ) {
       return LaboratoryDocumentKind.CERTIFICATE;
     }
-    if (/SOHASI|СОҲАСИ|ОБЛАСТ[ЬИ]\s+АККРЕДИТАЦИИ|ILOVA|ИЛОВА|ПРИЛОЖЕНИЕ/.test(head)) {
+    if (
+      /SOHASI|СОҲАСИ|ОБЛАСТ[ЬИ]\s+АККРЕДИТАЦИИ|ILOVA|ИЛОВА|ПРИЛОЖЕНИЕ/.test(
+        head,
+      )
+    ) {
       return LaboratoryDocumentKind.SCOPE;
     }
     return LaboratoryDocumentKind.CERTIFICATE;
@@ -113,13 +129,20 @@ export class LaboratoryDocumentsService {
     const out: Record<string, string> = {};
     const head = text.slice(0, 4000);
 
-    const number = head.match(/\b((?:O'?Z|О'?З)AK[.\s]?[A-Z]{2}[.\s]?\d{3,5}|ML[.\s]?\d{3,5})\b/i);
-    if (number) out.accreditationNumber = number[1].replace(/\s/g, '').toUpperCase();
+    const number = head.match(
+      /\b((?:O'?Z|О'?З)AK[.\s]?[A-Z]{2}[.\s]?\d{3,5}|ML[.\s]?\d{3,5})\b/i,
+    );
+    if (number)
+      out.accreditationNumber = number[1].replace(/\s/g, '').toUpperCase();
 
-    const tin = head.match(/\b(?:STIR|ИНН|INN)\D{0,12}(\d{9})\b/i) ?? head.match(/\b(\d{9})\b/);
+    const tin =
+      head.match(/\b(?:STIR|ИНН|INN)\D{0,12}(\d{9})\b/i) ??
+      head.match(/\b(\d{9})\b/);
     if (tin) out.taxId = tin[1];
 
-    const std = head.match(/(O['`’]?z\s?DSt[^,;\n]{0,40}\d{4})|((?:ISO|IEC)[\s/]*\d{4,5}(?::\d{4})?)/i);
+    const std = head.match(
+      /(O['`’]?z\s?DSt[^,;\n]{0,40}\d{4})|((?:ISO|IEC)[\s/]*\d{4,5}(?::\d{4})?)/i,
+    );
     if (std) out.standard = (std[1] ?? std[2]).replace(/\s+/g, ' ').trim();
 
     const email = head.match(/[\w.\-]+@[\w.\-]+\.\w{2,}/);
@@ -129,7 +152,9 @@ export class LaboratoryDocumentsService {
     // matched "3900-2022" out of the standard designation "O'z DSt 3900-2022"
     // and offered it as the laboratory's phone — a wrong prefill is worse than
     // none, because the submitter may not notice it.
-    const phone = head.match(/(?:\+998|\(\s*\d{2,4}\s*\))[\s\-]?\d[\d\s\-]{5,12}\d/);
+    const phone = head.match(
+      /(?:\+998|\(\s*\d{2,4}\s*\))[\s-]?\d[\d\s-]{5,12}\d/,
+    );
     if (phone) out.phone = phone[0].replace(/\s+/g, ' ').trim();
 
     // Regions must come back as the exact stored value, or the form's select
@@ -196,7 +221,13 @@ export class LaboratoryDocumentsService {
   listFor(laboratoryId: string) {
     return this.prisma.laboratoryDocument.findMany({
       where: { laboratoryId },
-      select: { id: true, kind: true, filename: true, sizeBytes: true, createdAt: true },
+      select: {
+        id: true,
+        kind: true,
+        filename: true,
+        sizeBytes: true,
+        createdAt: true,
+      },
     });
   }
 

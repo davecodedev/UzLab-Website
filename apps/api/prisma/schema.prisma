@@ -34,6 +34,7 @@ model User {
   refreshTokens          RefreshToken[]
   member                 Member?
   membershipApplications MembershipApplication[]
+  payments               Payment[]
   contactSubmissions     ContactSubmission[]
   laboratoryClaims       LaboratoryClaim[]
   submittedLaboratories  Laboratory[]            @relation("SubmittedLaboratories")
@@ -75,6 +76,7 @@ model MembershipType {
 
   applications MembershipApplication[]
   members      Member[]
+  payments     Payment[]
 }
 
 model MembershipApplication {
@@ -588,4 +590,72 @@ model IcsClass {
 
   @@index([parent])
   @@index([level])
+}
+
+// --- Payments --------------------------------------------------------------
+
+// The gateways Uzbekistan actually uses. Stripe does not operate here, and
+// both of these invert the usual flow: we never charge a card, we expose an
+// endpoint they call once the payer has authorised it on their side. Card
+// details never reach this system.
+enum PaymentGateway {
+  PAYME // JSON-RPC merchant API, amounts in tiyin
+  CLICK // Prepare/Complete callbacks, MD5-signed
+}
+
+enum PaymentStatus {
+  PENDING // invoice raised, nobody has paid yet
+  HELD // gateway created a transaction and is holding it
+  PAID // money taken; membership extended
+  CANCELLED // abandoned or reversed before completion
+  REFUNDED // reversed after completion
+}
+
+/// One membership purchase.
+///
+/// Created before the payer is sent to the gateway, so there is always a local
+/// record to check a callback against — the amount in a callback is never
+/// trusted, it is compared with this row.
+model Payment {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  membershipTypeId String
+  membershipType   MembershipType @relation(fields: [membershipTypeId], references: [id])
+
+  gateway PaymentGateway
+  status  PaymentStatus  @default(PENDING)
+
+  /// Minor units, as the gateways expect: tiyin for so'm. Fixed when the
+  /// invoice is raised so a later price change cannot alter what was agreed.
+  amountMinor Int
+  currency    String @default("UZS")
+
+  /// How many days of membership this buys, copied from the type at purchase
+  /// time for the same reason.
+  durationDays Int
+
+  /// The gateway's own transaction id. Unique so a repeated callback — they do
+  /// retry — cannot be processed twice.
+  gatewayTransactionId String? @unique
+  /// Gateway-side creation time, in their epoch milliseconds.
+  gatewayCreatedAt     BigInt?
+  gatewayPerformedAt   BigInt?
+  gatewayCancelledAt   BigInt?
+  /// Gateway's reason code for a cancellation, kept verbatim.
+  cancelReason         Int?
+
+  paidAt DateTime?
+
+  /// The last callback body, for reconciling a disputed payment.
+  lastCallback Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([gateway, status])
+  @@index([createdAt])
 }

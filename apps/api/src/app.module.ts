@@ -6,6 +6,7 @@ import { MembershipModule } from './modules/membership/membership.module.js';
 import { MediaModule } from './modules/media/media.module.js';
 import { LaboratoriesModule } from './modules/laboratories/laboratories.module.js';
 import { StandardsModule } from './modules/standards/standards.module.js';
+import { PaymentsModule } from './modules/payments/payments.module.js';
 import { SearchModule } from './modules/search/search.module.js';
 import { HealthModule } from './modules/health/health.module.js';
 import { ImportsModule } from './modules/imports/imports.module.js';
@@ -25,6 +26,7 @@ import { ClaimsModule } from './modules/claims/claims.module.js';
     MediaModule,
     LaboratoriesModule,
     StandardsModule,
+    PaymentsModule,
     SearchModule,
     HealthModule,
     ImportsModule,

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import { useLang, type Lang } from "@/lib/i18n";
 import { api } from "@/lib/api";
+import { getAccessToken } from "@/lib/auth-client";
 import {
   BODY_TYPE_OPTIONS,
   EMPTY_FILTERS,
@@ -25,6 +26,7 @@ import {
   type RegistryFilters,
 } from "./registry-data";
 import { exportCsv, exportXlsx, printPdf } from "./export-utils";
+import { RestrictedNotice } from "./RestrictedNotice";
 import {
   clearRecentSearches,
   loadRecentSearches,
@@ -222,6 +224,42 @@ function IconChevronDown({ size = 14 }: { size?: number }) {
 export function RegistryApp({ laboratories }: { laboratories: Laboratory[] }) {
   const { lang } = useLang();
 
+  // The page renders on the server, which has no way to read a token from the
+  // browser — so what arrives as a prop is always the public view. A signed-in
+  // member re-fetches with their token and the fuller records replace it.
+  //
+  // Rendering the public view first is deliberate rather than a compromise:
+  // it is what search engines index, and it means the page is useful before
+  // any of this resolves.
+  const [rows, setRows] = useState<Laboratory[]>(laboratories);
+  const [restricted, setRestricted] = useState(true);
+
+  useEffect(() => {
+    const token = getAccessToken();
+    if (!token) return;
+
+    let cancelled = false;
+    api
+      .get<Laboratory[]>("/laboratories", token)
+      .then((full) => {
+        if (cancelled) return;
+        // A member gets accreditation data back; anyone else gets the same
+        // public shape again, and the prompt stays.
+        const upgraded = full.some((lab) => lab.accreditationStatus !== undefined);
+        if (upgraded) {
+          setRows(full);
+          setRestricted(false);
+        }
+      })
+      .catch(() => {
+        // Session lapsed or the service is unreachable: the public view is
+        // already on screen and remains correct.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const [filters, setFilters] = useState<RegistryFilters>(EMPTY_FILTERS);
   const [view, setView] = useState<"table" | "cards" | "map" | "chart">("table");
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
@@ -307,14 +345,15 @@ export function RegistryApp({ laboratories }: { laboratories: Laboratory[] }) {
   }, [filters.keywords]);
 
   const filtered = useMemo(
-    () => laboratories.filter((lab) => matches(lab, filters, keywordIds)),
-    [laboratories, filters, keywordIds],
+    () => rows.filter((lab) => matches(lab, filters, keywordIds)),
+    [rows, filters, keywordIds],
   );
 
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const lab of filtered) {
-      counts[lab.accreditationStatus] = (counts[lab.accreditationStatus] ?? 0) + 1;
+      const status = lab.accreditationStatus ?? "UNKNOWN";
+      counts[status] = (counts[status] ?? 0) + 1;
     }
     return counts;
   }, [filtered]);
@@ -500,7 +539,7 @@ export function RegistryApp({ laboratories }: { laboratories: Laboratory[] }) {
           <SavedViewsBar
             lang={lang}
             savedViews={savedViews}
-            dataset={laboratories}
+            dataset={rows}
             onApply={(v) => applyFilters(v.filters)}
             onRemove={handleRemoveSavedView}
             onSave={handleSaveView}
@@ -516,7 +555,7 @@ export function RegistryApp({ laboratories }: { laboratories: Laboratory[] }) {
 
           <div className="reg-print-hide mt-5 flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm" style={{ color: "var(--reg-gray-1)" }}>
-              {UI.showingOf[lang](filtered.length, laboratories.length)}
+              {UI.showingOf[lang](filtered.length, rows.length)}
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex overflow-hidden rounded-[9px]" style={{ border: "1px solid var(--reg-border)" }}>
@@ -567,7 +606,8 @@ export function RegistryApp({ laboratories }: { laboratories: Laboratory[] }) {
             </div>
           </div>
 
-          <div ref={resultsRef}>
+          {restricted && <RestrictedNotice />}
+        <div ref={resultsRef}>
             {filtered.length === 0 ? (
               <EmptyState lang={lang} onClear={clearAll} />
             ) : view === "table" ? (
@@ -1129,7 +1169,7 @@ function TableView({ lang, laboratories }: { lang: Lang; laboratories: Laborator
               <td className="px-4 py-3 align-top" style={{ color: "var(--reg-gray-1)" }}>
                 {/* Member-added entries carry no register; `source` makes them
                     read as self-declared rather than as a blank cell. */}
-                {registerLabel(lab.register, lang, lab.source)}
+                {registerLabel(lab.register ?? null, lang, lab.source)}
                 {lab.registerStatusLabel && (
                   <div className="mt-0.5 text-[11px]" style={{ color: "var(--reg-gray-3)" }}>
                     {lab.registerStatusLabel}
@@ -1137,7 +1177,7 @@ function TableView({ lang, laboratories }: { lang: Lang; laboratories: Laborator
                 )}
               </td>
               <td className="px-4 py-3 align-top" style={{ color: "var(--reg-gray-1)" }}>
-                {bodyTypeLabel(lab.bodyType, lang)}
+                {bodyTypeLabel(lab.bodyType ?? null, lang)}
               </td>
               <td className="reg-mono px-4 py-3 align-top whitespace-nowrap" style={{ color: "var(--reg-gray-1)" }}>
                 {lab.taxId ?? "—"}
@@ -1146,7 +1186,7 @@ function TableView({ lang, laboratories }: { lang: Lang; laboratories: Laborator
                 {regionLabel(lab.region, lang)}
               </td>
               <td className="px-4 py-3 align-top">
-                <StatusPill status={lab.accreditationStatus} lang={lang} />
+                <StatusPill status={lab.accreditationStatus ?? "UNKNOWN"} lang={lang} />
               </td>
             </tr>
           ))}
@@ -1189,7 +1229,7 @@ function CardsView({ lang, laboratories }: { lang: Lang; laboratories: Laborator
             <span className="reg-mono text-xs font-semibold" style={{ color: "var(--reg-blue)" }}>
               {lab.accreditationNumber ?? "—"}
             </span>
-            <StatusPill status={lab.accreditationStatus} lang={lang} />
+            <StatusPill status={lab.accreditationStatus ?? "UNKNOWN"} lang={lang} />
           </div>
           <p className="mt-2 text-sm font-bold leading-snug" style={{ color: "var(--reg-ink)" }}>
             {lab.name}
@@ -1206,10 +1246,10 @@ function CardsView({ lang, laboratories }: { lang: Lang; laboratories: Laborator
             {(lab.register || isSelfRegistered(lab)) && (
               <CardRow
                 label={t("colRegister", lang)}
-                value={registerLabel(lab.register, lang, lab.source)}
+                value={registerLabel(lab.register ?? null, lang, lab.source)}
               />
             )}
-            <CardRow label={t("colType", lang)} value={bodyTypeLabel(lab.bodyType, lang)} />
+            <CardRow label={t("colType", lang)} value={bodyTypeLabel(lab.bodyType ?? null, lang)} />
             {lab.taxId && <CardRow label={t("colTaxId", lang)} value={lab.taxId} mono />}
             <CardRow label={t("colRegion", lang)} value={regionLabel(lab.region, lang)} />
             {lab.standard && <CardRow label={t("colStandard", lang)} value={lab.standard} mono />}

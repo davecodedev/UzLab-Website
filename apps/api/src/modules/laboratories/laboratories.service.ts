@@ -1,4 +1,9 @@
-import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConformityBodyType, Prisma } from '@prisma/client';
 
 /** Body types that count as laboratories — mirrors the importers. */
@@ -12,21 +17,48 @@ const LABORATORY_BODY_TYPES = new Set<ConformityBodyType>([
 import { PrismaService } from '../../common/prisma/prisma.service.js';
 import { slugify } from '../../common/utils/slugify.js';
 import { ListLaboratoriesDto } from './dto/list-laboratories.dto.js';
-import { SubmitLaboratoryDto, ReviewSubmissionDto } from './dto/submit-laboratory.dto.js';
+import {
+  SubmitLaboratoryDto,
+  ReviewSubmissionDto,
+} from './dto/submit-laboratory.dto.js';
 import { foldQueryTerms } from '../../common/utils/translit.js';
 import { buildSearchKey } from '../../common/utils/search-key.js';
 import { CreateLaboratoryDto } from './dto/create-laboratory.dto.js';
+import {
+  ANONYMOUS,
+  seesEverything,
+  toPublicLaboratory,
+  viewerFor,
+  type Viewer,
+} from '../../common/access/viewer.js';
+import type { AuthenticatedUser } from '../../common/types/authenticated-request.js';
 import { UpdateLaboratoryDto } from './dto/update-laboratory.dto.js';
 
 @Injectable()
 export class LaboratoriesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  list(filters: ListLaboratoriesDto) {
+  /**
+   * Resolves who is asking. A signed-in user's membership decides whether they
+   * get whole records, so it has to be looked up per request rather than
+   * trusted from the token — a membership can lapse between logins.
+   */
+  async resolveViewer(user?: AuthenticatedUser): Promise<Viewer> {
+    if (!user) return ANONYMOUS;
+    const member = await this.prisma.member.findUnique({
+      where: { userId: user.id },
+      select: { expiresAt: true },
+    });
+    return viewerFor(user, member);
+  }
+
+  async list(filters: ListLaboratoriesDto, viewer: Viewer = ANONYMOUS) {
     const where: Prisma.LaboratoryWhereInput = {
       deletedAt: null,
       isPublished: true,
-      region: filters.region ? { equals: filters.region, mode: 'insensitive' } : undefined,
+      region: filters.region
+        ? { equals: filters.region, mode: 'insensitive' }
+        : undefined,
       accreditationStatus: filters.status,
       fields: filters.field ? { has: filters.field } : undefined,
       ...(filters.q && {
@@ -42,11 +74,16 @@ export class LaboratoriesService {
     // folded copy of it plus every other searchable field, so it is larger
     // still. Both are server-side only; the list response would otherwise be
     // tens of megabytes.
-    return this.prisma.laboratory.findMany({
+    const rows = await this.prisma.laboratory.findMany({
       where,
       orderBy: { name: 'asc' },
       omit: { scopeText: true, searchText: true },
     });
+
+    // Narrowed here rather than in the query: the filters above still run over
+    // the whole record, so an anonymous reader can search by region and get
+    // honest results — they just do not receive the fields they cannot see.
+    return seesEverything(viewer) ? rows : rows.map(toPublicLaboratory);
   }
 
   /**
@@ -90,21 +127,27 @@ export class LaboratoriesService {
     });
   }
 
-  async getBySlug(slug: string) {
+  async getBySlug(slug: string, viewer: Viewer = ANONYMOUS) {
+    const full = seesEverything(viewer);
     const lab = await this.prisma.laboratory.findFirst({
       where: { slug, deletedAt: null, isPublished: true },
       // Member-supplied detail travels with the record; the page shows it
       // alongside the register's own data rather than replacing it.
       // Document metadata only — the bytes are streamed from their own route.
-      include: {
-        profile: true,
-        documents: { select: { id: true, kind: true, filename: true, sizeBytes: true } },
-      },
+      include: full
+        ? {
+            profile: true,
+            documents: {
+              select: { id: true, kind: true, filename: true, sizeBytes: true },
+            },
+          }
+        : undefined,
+      omit: { scopeText: true, searchText: true },
     });
     if (!lab) {
       throw new NotFoundException('Laboratory not found');
     }
-    return lab;
+    return full ? lab : toPublicLaboratory(lab);
   }
 
   async create(dto: CreateLaboratoryDto) {
@@ -145,7 +188,10 @@ export class LaboratoriesService {
       await this.ensureSlugAvailable(slug, id);
     }
     if (dto.accreditationNumber) {
-      await this.ensureAccreditationNumberAvailable(dto.accreditationNumber, id);
+      await this.ensureAccreditationNumberAvailable(
+        dto.accreditationNumber,
+        id,
+      );
     }
 
     return this.prisma.laboratory.update({
@@ -197,13 +243,20 @@ export class LaboratoriesService {
       data: {
         ...rest,
         slug,
-        accreditationDate: accreditationDate ? new Date(accreditationDate) : undefined,
-        accreditedUntil: accreditedUntil ? new Date(accreditedUntil) : undefined,
+        accreditationDate: accreditationDate
+          ? new Date(accreditationDate)
+          : undefined,
+        accreditedUntil: accreditedUntil
+          ? new Date(accreditedUntil)
+          : undefined,
         fields: dto.fields ?? [],
         directions: dto.directions ?? [],
         isLaboratory: LABORATORY_BODY_TYPES.has(dto.bodyType),
         // Member-added laboratories must be as findable as imported ones.
-        searchText: buildSearchKey({ ...rest, directions: dto.directions ?? [] }),
+        searchText: buildSearchKey({
+          ...rest,
+          directions: dto.directions ?? [],
+        }),
         source: 'SELF_REGISTERED',
         // No register: these are not in akkred.uz or approval.depstan.uz, which
         // is also what keeps the scheduled imports from ever touching them.
@@ -224,7 +277,8 @@ export class LaboratoriesService {
       where: { id: laboratoryId, submittedByUserId: userId },
       select: { id: true },
     });
-    if (!lab) throw new ForbiddenException('You did not submit this laboratory.');
+    if (!lab)
+      throw new ForbiddenException('You did not submit this laboratory.');
   }
 
   /** Member-submitted entries awaiting a staff decision. */
@@ -232,7 +286,9 @@ export class LaboratoriesService {
     return this.prisma.laboratory.findMany({
       where: { source: 'SELF_REGISTERED', isPublished: false, deletedAt: null },
       orderBy: { submittedAt: 'asc' },
-      include: { submittedBy: { select: { id: true, email: true, fullName: true } } },
+      include: {
+        submittedBy: { select: { id: true, email: true, fullName: true } },
+      },
     });
   }
 
@@ -279,7 +335,9 @@ export class LaboratoriesService {
       if (!taken) return candidate;
       candidate = `${base}-${i}`;
     }
-    throw new ConflictException('Could not generate a unique address for this name.');
+    throw new ConflictException(
+      'Could not generate a unique address for this name.',
+    );
   }
 
   async softDelete(id: string) {
@@ -291,7 +349,9 @@ export class LaboratoriesService {
   }
 
   private async getById(id: string) {
-    const lab = await this.prisma.laboratory.findFirst({ where: { id, deletedAt: null } });
+    const lab = await this.prisma.laboratory.findFirst({
+      where: { id, deletedAt: null },
+    });
     if (!lab) {
       throw new NotFoundException('Laboratory not found');
     }
@@ -299,16 +359,25 @@ export class LaboratoriesService {
   }
 
   private async ensureSlugAvailable(slug: string, excludeId?: string) {
-    const existing = await this.prisma.laboratory.findUnique({ where: { slug } });
+    const existing = await this.prisma.laboratory.findUnique({
+      where: { slug },
+    });
     if (existing && existing.id !== excludeId) {
       throw new ConflictException(`Slug "${slug}" is already in use`);
     }
   }
 
-  private async ensureAccreditationNumberAvailable(accreditationNumber: string, excludeId?: string) {
-    const existing = await this.prisma.laboratory.findUnique({ where: { accreditationNumber } });
+  private async ensureAccreditationNumberAvailable(
+    accreditationNumber: string,
+    excludeId?: string,
+  ) {
+    const existing = await this.prisma.laboratory.findUnique({
+      where: { accreditationNumber },
+    });
     if (existing && existing.id !== excludeId) {
-      throw new ConflictException(`Accreditation number "${accreditationNumber}" is already in use`);
+      throw new ConflictException(
+        `Accreditation number "${accreditationNumber}" is already in use`,
+      );
     }
   }
 }
