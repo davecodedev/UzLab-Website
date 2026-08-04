@@ -64,6 +64,8 @@ export interface CenCriteria {
   statuses?: string[];
   /** Substring match on the standard's reference. */
   reference?: string;
+  /** A HEAD_LIST value — the deliverable type (EN, HD, TS, TR, CWA). */
+  deliverable?: string;
 }
 
 /** APEX writes its hidden tokens HTML-escaped; posting them raw silently fails. */
@@ -114,7 +116,7 @@ export async function search(criteria: CenCriteria): Promise<CenSearchResult> {
     ['LANGUAGE_LIST', '0'],
     ['TC_CODE_LIST', criteria.tcCode ?? ''],
     ['TC_NAME_LIST', ''],
-    ['HEAD_LIST', ''],
+    ['HEAD_LIST', criteria.deliverable ?? ''],
     ['STAND_REF', criteria.reference ?? ''],
     ['DIRECTIVES_LIST', ''],
   ];

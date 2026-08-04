@@ -16,6 +16,7 @@ import { createHash } from 'node:crypto';
 import { PrismaClient, StandardRegister, StandardStatus } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import {
+  RESULT_CAP,
   listCommitteeCodes,
   search,
   type CenRow,
@@ -26,8 +27,22 @@ import {
   type StandardScrapeResult,
 } from './lib/safe-standard-import';
 
-/** Status codes the form's checkbox group offers, for splitting a capped committee. */
-const STATUS_CODES = ['S1', 'S2', 'S3', 'S4', 'S5', 'S6'];
+/**
+ * How a committee that hits the ceiling gets subdivided.
+ *
+ * Not by status: the form offers status checkboxes, but they are ignored by the
+ * server — all six return byte-identical result sets, which is what made the
+ * first attempt at this look like it was working while changing nothing.
+ *
+ * Not by deliverable type either, at least not alone: the type list offers only
+ * the five current kinds, and the catalogue still carries CR and ENV documents
+ * from before they existed, which a type-split silently drops.
+ *
+ * So it is by reference prefix, with the vocabulary of prefixes learned from
+ * every committee that did *not* hit the ceiling. The catalogue's own data
+ * decides what prefixes exist rather than a list written here going stale.
+ */
+const MIN_PREFIX_SAMPLE = 20;
 
 /** Pause between searches. The source is a shared public service, not ours. */
 const DELAY_MS = 250;
@@ -52,7 +67,8 @@ function mapStatus(label: string): StandardStatus {
     value.startsWith('under ') ||
     value.startsWith('draft') ||
     value === 'approved' ||
-    value === 'registered'
+    value === 'registered' ||
+    value === 'preliminary'
   ) {
     return StandardStatus.NOT_YET_IN_FORCE;
   }
@@ -144,46 +160,50 @@ function toRecord(row: CenRow): ScrapedStandard | null {
   };
 }
 
+/** "CEN/TR 14734:2004" -> "CEN/TR"; "prEN 50191:2026" -> "prEN". */
+function prefixOf(reference: string): string {
+  return reference.trim().split(/\s+/)[0] ?? '';
+}
+
 async function scrape(): Promise<StandardScrapeResult> {
   const committees = await listCommitteeCodes();
   console.log(`${committees.length} technical committees to walk`);
 
   const byReference = new Map<string, ScrapedStandard>();
   const fetchFailures: string[] = [];
-  const stillCapped: string[] = [];
   const unmappedStatuses = new Map<string, number>();
+  /** Committees whose first search hit the ceiling, revisited in a second pass. */
+  const cappedCommittees: { value: string; label: string }[] = [];
+  const prefixes = new Set<string>();
+
+  const take = (rows: CenRow[]) => {
+    for (const row of rows) {
+      if (mapStatus(row.status) === StandardStatus.UNKNOWN && row.status.trim()) {
+        unmappedStatuses.set(row.status, (unmappedStatuses.get(row.status) ?? 0) + 1);
+      }
+      const record = toRecord(row);
+      // The same document is reachable from more than one committee listing;
+      // the reference is the identity, so the first sighting wins.
+      if (record && !byReference.has(record.sourceId)) {
+        byReference.set(record.sourceId, record);
+      }
+    }
+  };
 
   let done = 0;
   for (const committee of committees) {
     done += 1;
     try {
-      let result = await search({ tcCode: committee.value });
-
-      // A committee at the ceiling is missing rows. Split it by status, which
-      // partitions the same set without overlapping.
+      const result = await search({ tcCode: committee.value });
+      take(result.rows);
       if (result.capped) {
-        console.log(`  ${committee.label} hit the cap — splitting by status`);
-        const rows: CenRow[] = [];
-        let anyStillCapped = false;
-        for (const status of STATUS_CODES) {
-          await sleep(DELAY_MS);
-          const part = await search({ tcCode: committee.value, statuses: [status] });
-          rows.push(...part.rows);
-          if (part.capped) anyStillCapped = true;
-        }
-        if (anyStillCapped) stillCapped.push(committee.label);
-        result = { rows, capped: anyStillCapped };
-      }
-
-      for (const row of result.rows) {
-        if (mapStatus(row.status) === StandardStatus.UNKNOWN && row.status.trim()) {
-          unmappedStatuses.set(row.status, (unmappedStatuses.get(row.status) ?? 0) + 1);
-        }
-        const record = toRecord(row);
-        // The same document is reachable from more than one committee listing;
-        // the reference is the identity, so the first sighting wins.
-        if (record && !byReference.has(record.sourceId)) {
-          byReference.set(record.sourceId, record);
+        cappedCommittees.push(committee);
+      } else {
+        // Only an uncapped committee is a trustworthy sample of what prefixes
+        // exist: a truncated one shows whatever sorted first.
+        for (const row of result.rows) {
+          const prefix = prefixOf(row.reference);
+          if (prefix) prefixes.add(prefix);
         }
       }
     } catch (error) {
@@ -198,6 +218,36 @@ async function scrape(): Promise<StandardScrapeResult> {
     await sleep(DELAY_MS);
   }
 
+  const stillCapped: string[] = [];
+  if (cappedCommittees.length) {
+    if (prefixes.size < MIN_PREFIX_SAMPLE) {
+      throw new Error(
+        `only ${prefixes.size} reference prefixes were learned; too few to subdivide safely`,
+      );
+    }
+    const vocabulary = [...prefixes].sort();
+    console.log(
+      `${cappedCommittees.length} committee(s) hit the cap; re-walking them across ` +
+        `${vocabulary.length} reference prefixes`,
+    );
+
+    for (const committee of cappedCommittees) {
+      let anyStillCapped = false;
+      for (const prefix of vocabulary) {
+        try {
+          const part = await search({ tcCode: committee.value, reference: prefix });
+          take(part.rows);
+          if (part.capped) anyStillCapped = true;
+        } catch (error) {
+          fetchFailures.push(`${committee.label} (${prefix}): ${(error as Error).message}`);
+        }
+        await sleep(DELAY_MS);
+      }
+      if (anyStillCapped) stillCapped.push(committee.label);
+      console.log(`  ${committee.label}: re-walked${anyStillCapped ? ' — STILL CAPPED' : ''}`);
+    }
+  }
+
   if (unmappedStatuses.size) {
     console.log('status wordings that fell through to UNKNOWN:');
     for (const [label, count] of [...unmappedStatuses].sort((a, b) => b[1] - a[1])) {
@@ -209,8 +259,8 @@ async function scrape(): Promise<StandardScrapeResult> {
   // number below would otherwise read as the whole of it.
   if (stillCapped.length) {
     console.log(
-      `INCOMPLETE: ${stillCapped.length} committee(s) still at the 1 000-row cap after ` +
-        `splitting by status — ${stillCapped.join(', ')}`,
+      `INCOMPLETE: ${stillCapped.length} committee(s) still at the ${RESULT_CAP}-row cap ` +
+        `even split by prefix — ${stillCapped.join(', ')}`,
     );
   }
 
@@ -220,7 +270,7 @@ async function scrape(): Promise<StandardScrapeResult> {
   console.log(
     `${records.length.toLocaleString('en-GB')} distinct documents` +
       (disambiguated ? `, ${disambiguated} slug(s) disambiguated` : '') +
-      (fetchFailures.length ? `, ${fetchFailures.length} committee(s) failed` : ''),
+      (fetchFailures.length ? `, ${fetchFailures.length} search(es) failed` : ''),
   );
 
   // A duplicate here would fail mid-write again, thousands of rows in.
