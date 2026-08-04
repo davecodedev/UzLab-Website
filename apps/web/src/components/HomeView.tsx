@@ -34,9 +34,9 @@ const T = {
   p1a: { ru: "Членство", uz: "A'zolik", en: "Membership" },
   p3t: { ru: "Повысить квалификацию", uz: "Malaka oshirish", en: "Upskill your team" },
   p3s: {
-    ru: "Курсы, семинары и практикумы — очно в Ташкенте и онлайн.",
-    uz: "Kurslar, seminarlar va amaliyotlar — Toshkentda va onlayn.",
-    en: "Courses, seminars and workshops — in Tashkent and online.",
+    ru: "17 курсов повышения квалификации: метрология, испытания, ISO/IEC 17025, 17020, 17065.",
+    uz: "17 ta malaka oshirish kursi: metrologiya, sinovlar, ISO/IEC 17025, 17020, 17065.",
+    en: "17 professional development courses: metrology, testing, ISO/IEC 17025, 17020, 17065.",
   },
   p3a: { ru: "Обучение", uz: "O'qitish", en: "Training" },
   p4t: { ru: "Работа в лабораториях", uz: "Laboratoriyada ish", en: "Work in labs" },
