@@ -38,6 +38,8 @@ model User {
   contactSubmissions     ContactSubmission[]
   laboratoryClaims       LaboratoryClaim[]
   submittedLaboratories  Laboratory[]            @relation("SubmittedLaboratories")
+  postedVacancies        Vacancy[]               @relation("PostedVacancies")
+  jobApplications        JobApplication[]        @relation("SubmittedApplications")
 
   @@index([deletedAt])
 }
@@ -255,6 +257,7 @@ model Laboratory {
   claims    LaboratoryClaim[]
   profile   LaboratoryProfile?
   documents LaboratoryDocument[]
+  vacancies Vacancy[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -658,4 +661,110 @@ model Payment {
   @@index([status])
   @@index([gateway, status])
   @@index([createdAt])
+}
+
+// --- Careers -----------------------------------------------------------
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERNSHIP
+}
+
+enum VacancyStatus {
+  /// Written but not yet visible to job seekers.
+  DRAFT
+  PUBLISHED
+  /// Withdrawn or filled. Kept so applicants can still see what they applied to.
+  CLOSED
+}
+
+/// An open position, posted by the organisation that is hiring.
+///
+/// Deliberately not tied to a Laboratory row: an accredited body may hire, but
+/// so may a supplier, a training centre or a ministry, and requiring a register
+/// entry would exclude most real employers. `laboratoryId` is set when the
+/// poster has a claimed laboratory, and left null otherwise.
+model Vacancy {
+  id     String @id @default(uuid())
+  slug   String @unique
+  userId String
+  user   User   @relation("PostedVacancies", fields: [userId], references: [id], onDelete: Cascade)
+
+  laboratoryId String?
+  laboratory   Laboratory? @relation(fields: [laboratoryId], references: [id], onDelete: SetNull)
+
+  title            String
+  organisationName String
+  region           String?
+  city             String?
+  employmentType   EmploymentType @default(FULL_TIME)
+
+  /// Free text rather than a number: real postings say "from 8 million", "by
+  /// agreement", or nothing at all, and forcing a figure would invent one.
+  salary String?
+
+  description  String
+  requirements String?
+
+  contactEmail String
+  contactPhone String?
+
+  status VacancyStatus @default(PUBLISHED)
+  /// Marks a posting as urgent in the listing. Set by the poster.
+  urgent Boolean       @default(false)
+
+  publishedAt DateTime?
+  /// After this the posting stops appearing, so a filled job does not sit open
+  /// for a year because nobody came back to close it.
+  expiresAt   DateTime?
+
+  applications JobApplication[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, publishedAt])
+  @@index([userId])
+  @@index([region])
+}
+
+enum ApplicationStatus {
+  SUBMITTED
+  REVIEWING
+  SHORTLISTED
+  REJECTED
+  WITHDRAWN
+}
+
+/// One person's application to one vacancy.
+model JobApplication {
+  id        String  @id @default(uuid())
+  vacancyId String
+  vacancy   Vacancy @relation(fields: [vacancyId], references: [id], onDelete: Cascade)
+
+  /// Null for an application sent without an account.
+  userId String?
+  user   User?   @relation("SubmittedApplications", fields: [userId], references: [id], onDelete: SetNull)
+
+  fullName String
+  email    String
+  phone    String?
+  /// The applicant's own words. A CV upload can follow; this is what a person
+  /// can send today without one.
+  message  String
+  cvUrl    String?
+
+  status       ApplicationStatus @default(SUBMITTED)
+  /// The employer's private note. Never returned to the applicant.
+  employerNote String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// A signed-in applicant applies once per vacancy; re-submitting updates it.
+  @@unique([vacancyId, userId])
+  @@index([vacancyId, status])
+  @@index([userId])
 }

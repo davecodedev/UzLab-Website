@@ -6,6 +6,7 @@ import { MembershipModule } from './modules/membership/membership.module.js';
 import { MediaModule } from './modules/media/media.module.js';
 import { LaboratoriesModule } from './modules/laboratories/laboratories.module.js';
 import { StandardsModule } from './modules/standards/standards.module.js';
+import { CareersModule } from './modules/careers/careers.module.js';
 import { PaymentsModule } from './modules/payments/payments.module.js';
 import { ThrottlingModule } from './common/throttling.js';
 import { APP_GUARD } from '@nestjs/core';
@@ -29,6 +30,7 @@ import { ClaimsModule } from './modules/claims/claims.module.js';
     MediaModule,
     LaboratoriesModule,
     StandardsModule,
+    CareersModule,
     PaymentsModule,
     ThrottlingModule,
     SearchModule,
