@@ -197,13 +197,15 @@ export function StandardsApp() {
     (patch: Partial<StandardsQuery>, remembered = true) => {
       // Any filter change returns to the first page: page 7 of the old result
       // set is meaningless against the new one.
-      setQuery((q) => {
-        const next = { ...q, ...patch, page: patch.page ?? 1 };
-        if (remembered) remember(next);
-        return next;
-      });
+      //
+      // Built from `query` rather than inside a `setQuery` updater: the updater
+      // must be pure, and remembering from within one wrote to localStorage but
+      // never reached the rendered list.
+      const next = { ...query, ...patch, page: patch.page ?? 1 };
+      setQuery(next);
+      if (remembered) remember(next);
     },
-    [remember],
+    [query, remember],
   );
 
   const reset = useCallback(() => {
