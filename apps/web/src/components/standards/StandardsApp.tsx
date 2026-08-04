@@ -9,6 +9,17 @@ import {
   exportStandardsXlsx,
   printStandards,
 } from "./standards-export";
+import { SavedViewsBar, RecentSearchesCard } from "./StandardsShortcuts";
+import {
+  clearStandardsRecent,
+  describeQuery,
+  loadStandardsRecent,
+  loadStandardsViews,
+  pushStandardsRecent,
+  saveStandardsViews,
+  type StandardsRecent,
+  type StandardsView,
+} from "./storage";
 import { useLang, pick, type Lang } from "@/lib/i18n";
 import { formatNumber } from "@/lib/format";
 import {
@@ -83,6 +94,15 @@ const T = {
   of: { ru: "из", uz: "dan", en: "of" },
   pages: { ru: "с.", uz: "b.", en: "pp." },
   export: { ru: "Экспорт", uz: "Eksport", en: "Export" },
+  viewCards: { ru: "Карточки", uz: "Kartochkalar", en: "Cards" },
+  viewTable: { ru: "Таблица", uz: "Jadval", en: "Table" },
+  savePrompt: {
+    ru: "Название подборки",
+    uz: "To'plam nomi",
+    en: "Name for this saved view",
+  },
+  colDesignation: { ru: "Обозначение", uz: "Belgilanish", en: "Designation" },
+  colTitle: { ru: "Наименование", uz: "Nomi", en: "Title" },
   exportCsv: { ru: "Скачать CSV", uz: "CSV yuklab olish", en: "Download CSV" },
   exportXlsx: { ru: "Скачать XLSX", uz: "XLSX yuklab olish", en: "Download XLSX" },
   exportPrint: { ru: "Печать / PDF", uz: "Chop etish / PDF", en: "Print / PDF" },
@@ -110,6 +130,15 @@ export function StandardsApp() {
   const [facets, setFacets] = useState<StandardsFacets | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
+  const [view, setView] = useState<"cards" | "table">("cards");
+  const [savedViews, setSavedViews] = useState<StandardsView[]>([]);
+  const [recent, setRecent] = useState<StandardsRecent[]>([]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time hydrate from localStorage
+    setSavedViews(loadStandardsViews());
+    setRecent(loadStandardsRecent());
+  }, []);
 
   // Typing must not fire a request per keystroke, and a slow response for
   // "GOS" must never overwrite the results for "GOST" — hence the sequence
@@ -150,16 +179,61 @@ export function StandardsApp() {
       .catch(() => setFacets(null));
   }, []);
 
-  const update = useCallback((patch: Partial<StandardsQuery>) => {
-    // Any filter change returns to the first page: page 7 of the old result
-    // set is meaningless against the new one.
-    setQuery((q) => ({ ...q, ...patch, page: patch.page ?? 1 }));
-  }, []);
+  /**
+   * Recording a recent search on every settled keystroke would fill the list
+   * with "GOST 1", "GOST 12", "GOST 120". It is recorded on deliberate acts
+   * instead: choosing a facet, or pressing Enter in the search box.
+   */
+  const remember = useCallback(
+    (q: StandardsQuery) => {
+      const label = describeQuery(q, lang);
+      if (!label) return;
+      setRecent((prev) => pushStandardsRecent(prev, { label, filters: q }));
+    },
+    [lang],
+  );
+
+  const update = useCallback(
+    (patch: Partial<StandardsQuery>, remembered = true) => {
+      // Any filter change returns to the first page: page 7 of the old result
+      // set is meaningless against the new one.
+      setQuery((q) => {
+        const next = { ...q, ...patch, page: patch.page ?? 1 };
+        if (remembered) remember(next);
+        return next;
+      });
+    },
+    [remember],
+  );
 
   const reset = useCallback(() => {
     setText("");
     setQuery(EMPTY_QUERY);
   }, []);
+
+  const applyQuery = useCallback((q: StandardsQuery) => {
+    setText(q.q ?? "");
+    setQuery({ ...q, page: 1 });
+  }, []);
+
+  function handleSaveView() {
+    const name = window.prompt(pick(T.savePrompt, lang));
+    if (!name) return;
+    setSavedViews((prev) => {
+      // The id only has to be unique within this browser's list.
+      const next = [...prev, { id: `${prev.length}-${name}`, name, filters: query }];
+      saveStandardsViews(next);
+      return next;
+    });
+  }
+
+  function handleRemoveView(id: string) {
+    setSavedViews((prev) => {
+      const next = prev.filter((v) => v.id !== id);
+      saveStandardsViews(next);
+      return next;
+    });
+  }
 
   const [exporting, setExporting] = useState(false);
   const [exportNote, setExportNote] = useState<string | null>(null);
@@ -230,11 +304,21 @@ export function StandardsApp() {
             <input
               value={text}
               onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") remember({ ...query, q: text });
+              }}
               placeholder={pick(T.search, lang)}
               className={SELECT_CLASS}
               style={SELECT_STYLE}
             />
           </div>
+
+          <RecentSearchesCard
+            lang={lang}
+            entries={recent}
+            onApply={(entry) => applyQuery(entry.filters)}
+            onClear={() => setRecent(clearStandardsRecent())}
+          />
 
           <Facet label={pick(T.source, lang)}>
             <select
@@ -329,7 +413,7 @@ export function StandardsApp() {
           <Facet label={pick(T.sort, lang)}>
             <select
               value={query.sort ?? "newest"}
-              onChange={(e) => update({ sort: e.target.value as StandardsQuery["sort"] })}
+              onChange={(e) => update({ sort: e.target.value as StandardsQuery["sort"] }, false)}
               className={SELECT_CLASS}
               style={SELECT_STYLE}
             >
@@ -352,7 +436,33 @@ export function StandardsApp() {
         </aside>
 
         <div>
+          <SavedViewsBar
+            lang={lang}
+            views={savedViews}
+            canSave={isFiltered(query)}
+            onApply={(v) => applyQuery(v.filters)}
+            onRemove={handleRemoveView}
+            onSave={handleSaveView}
+          />
+
           <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
+            <div className="mr-auto flex overflow-hidden rounded-lg" style={{ border: "1px solid var(--uz-border)" }}>
+              {(["cards", "table"] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setView(v)}
+                  className="px-3 py-1.5 text-xs font-semibold transition-colors"
+                  style={
+                    view === v
+                      ? { background: "var(--uz-navy-900)", color: "#fff" }
+                      : { background: "var(--uz-bg-raised)", color: "var(--uz-text-muted)" }
+                  }
+                >
+                  {v === "cards" ? pick(T.viewCards, lang) : pick(T.viewTable, lang)}
+                </button>
+              ))}
+            </div>
             <ExportButton
               label={pick(T.exportCsv, lang)}
               disabled={exporting || !result?.total}
@@ -408,22 +518,25 @@ export function StandardsApp() {
             </p>
           )}
 
-          <ul
-            className="mt-4 space-y-3"
-            // Dimmed rather than blanked while reloading: replacing the list
-            // with a spinner on every filter change loses the reader's place.
-            style={{ opacity: loading ? 0.55 : 1, transition: "opacity 120ms" }}
-          >
-            {result?.items.map((item) => (
-              <StandardRow key={item.id} item={item} lang={lang} />
-            ))}
-          </ul>
+          {/* Dimmed rather than blanked while reloading: replacing the list
+              with a spinner on every filter change loses the reader's place. */}
+          <div className="mt-4" style={{ opacity: loading ? 0.55 : 1, transition: "opacity 120ms" }}>
+            {view === "cards" ? (
+              <ul className="space-y-3">
+                {result?.items.map((item) => (
+                  <StandardRow key={item.id} item={item} lang={lang} />
+                ))}
+              </ul>
+            ) : (
+              <StandardsTable items={result?.items ?? []} lang={lang} />
+            )}
+          </div>
 
           {result && result.total > result.pageSize && (
             <nav className="mt-8 flex items-center justify-between gap-4">
               <PagerButton
                 disabled={result.page <= 1}
-                onClick={() => update({ page: result.page - 1 })}
+                onClick={() => update({ page: result.page - 1 }, false)}
                 label={pick(T.prev, lang)}
               />
               <span className="text-sm" style={{ color: "var(--uz-text-muted)" }}>
@@ -432,7 +545,7 @@ export function StandardsApp() {
               </span>
               <PagerButton
                 disabled={result.page >= totalPages}
-                onClick={() => update({ page: result.page + 1 })}
+                onClick={() => update({ page: result.page + 1 }, false)}
                 label={pick(T.next, lang)}
               />
             </nav>
@@ -522,6 +635,72 @@ function StandardRow({ item, lang }: { item: StandardListItem; lang: "ru" | "uz"
         {item.language && <span>{item.language}</span>}
       </p>
     </li>
+  );
+}
+
+/**
+ * The same rows as the cards, denser. Wide content scrolls inside its own
+ * container so the page itself never scrolls sideways on a narrow screen.
+ */
+function StandardsTable({ items, lang }: { items: StandardListItem[]; lang: Lang }) {
+  if (!items.length) return null;
+
+  const th = "px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider";
+  const td = "px-3 py-2 align-top";
+
+  return (
+    <div className="overflow-x-auto rounded-xl" style={{ border: "1px solid var(--uz-border)" }}>
+      <table className="w-full min-w-[820px] border-collapse text-sm">
+        <thead>
+          <tr style={{ background: "var(--uz-bg-raised)", color: "var(--uz-text-faint)" }}>
+            <th className={th}>{pick(T.colDesignation, lang)}</th>
+            <th className={th}>{pick(T.colTitle, lang)}</th>
+            <th className={th}>{pick(T.source, lang)}</th>
+            <th className={th}>{pick(T.status, lang)}</th>
+            <th className={th}>{pick(T.ics, lang)}</th>
+            <th className={th}>{pick(T.year, lang)}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item) => {
+            const tone = statusTone(item.status);
+            return (
+              <tr key={item.id} style={{ borderTop: "1px solid var(--uz-border)" }}>
+                <td className={td}>
+                  <Link
+                    href={`/standards/${item.slug}`}
+                    className="font-bold underline-offset-2 hover:underline"
+                    style={{ color: "var(--uz-navy-900)", fontFamily: "var(--uz-font-mono)" }}
+                  >
+                    {item.designation}
+                  </Link>
+                </td>
+                <td className={td} style={{ color: "var(--uz-text)" }}>
+                  {item.title}
+                </td>
+                <td className={td} style={{ color: "var(--uz-text-muted)" }}>
+                  {pick(REGISTER_LABELS[item.register], lang)}
+                </td>
+                <td className={td}>
+                  <span
+                    className="whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                    style={{ background: tone.bg, color: tone.fg }}
+                  >
+                    {pick(STATUS_LABELS[item.status], lang)}
+                  </span>
+                </td>
+                <td className={td} style={{ color: "var(--uz-text-muted)" }}>
+                  {item.icsCode ?? ""}
+                </td>
+                <td className={td} style={{ color: "var(--uz-text-muted)" }}>
+                  {item.year ?? ""}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
