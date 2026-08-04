@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useLang, pick, type Lang } from "@/lib/i18n";
-import { formatCurrency } from "@/lib/format";
+import { Pager, pageSlice } from "@/components/Pager";
+import { formatCurrency, formatDateLong } from "@/lib/format";
 import { MembershipCta } from "@/components/MembershipCta";
 
 export interface MembershipType {
@@ -17,9 +19,15 @@ export interface MembershipType {
 export interface DirectoryEntry {
   id: string;
   organization: string | null;
+  /** When the membership began. */
+  memberSince: string;
+  /** Null means open-ended rather than already lapsed. */
+  expiresAt: string | null;
   user: { fullName: string };
   membershipType: { name: string };
 }
+
+const DIRECTORY_PAGE_SIZE = 10;
 
 const UI = {
   pageTitle: { ru: "Членство в ассоциации", uz: "Assotsiatsiyada a'zolik", en: "Association membership" },
@@ -48,6 +56,9 @@ const UI = {
     en: "MEMBER LABORATORY DIRECTORY",
   },
   directoryTitle: { ru: "Члены ассоциации", uz: "Assotsiatsiya a'zolari", en: "Association members" },
+  joined: { ru: "В ассоциации с", uz: "Assotsiatsiyada", en: "Member since" },
+  statusActive: { ru: "Действует", uz: "Amalda", en: "Active" },
+  statusExpired: { ru: "Истекло", uz: "Muddati tugagan", en: "Expired" },
   directoryEmpty: {
     ru: "В директории пока нет членов.",
     uz: "Direktoriyada hali a'zolar yo'q.",
@@ -160,6 +171,19 @@ export function MembershipView({
   const { lang } = useLang();
   const t = <K extends keyof typeof UI>(key: K) => pick(UI[key], lang);
 
+  // Ten at a time: the directory grows with the association, and a page that
+  // renders every member is one that gets slower every time someone joins.
+  // Read once on mount rather than per row: a clock read during render differs
+  // between the server pass and hydration, and React flags it for that reason.
+  const [now, setNow] = useState(0);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time clock read after hydration
+    setNow(Date.now());
+  }, []);
+
+  const [directoryPage, setDirectoryPage] = useState(1);
+  const visibleDirectory = pageSlice(directory, directoryPage, DIRECTORY_PAGE_SIZE);
+
   const laboratoryTypes = types.filter((type) => type.slug.startsWith("laboratory"));
   const associateTypes = types.filter((type) => type.slug.startsWith("associate"));
   const otherTypes = types.filter(
@@ -227,7 +251,7 @@ export function MembershipView({
           </div>
         ) : (
           <div className="overflow-hidden rounded-xl bg-white" style={{ border: "1px solid var(--uz-border)" }}>
-            {directory.map((entry, i) => (
+            {visibleDirectory.map((entry, i) => (
               <div
                 key={entry.id}
                 className="flex items-center gap-4 px-6 py-4"
@@ -246,12 +270,58 @@ export function MembershipView({
                   <p className="truncate text-sm" style={{ color: "var(--uz-text-muted)" }}>
                     {entry.organization ?? "—"} · {entry.membershipType.name}
                   </p>
+                  <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs" style={{ color: "var(--uz-text-faint)" }}>
+                    <span>
+                      {t("joined")} {formatDateLong(entry.memberSince, lang)}
+                    </span>
+                    <MembershipStatus active={isActive(entry.expiresAt, now)} lang={lang} />
+                  </p>
                 </div>
               </div>
             ))}
           </div>
         )}
+
+        <Pager
+          page={directoryPage}
+          pageSize={DIRECTORY_PAGE_SIZE}
+          total={directory.length}
+          onChange={setDirectoryPage}
+        />
       </section>
     </div>
   );
+}
+
+/**
+ * Whether the membership is current.
+ *
+ * Deliberately not the application outcome. A public directory saying an
+ * organisation was rejected would publish something the association was told in
+ * confidence; staff see that in the review queue instead.
+ */
+function MembershipStatus({ active, lang }: { active: boolean; lang: Lang }) {
+  const label = active
+    ? pick(UI.statusActive, lang)
+    : pick(UI.statusExpired, lang);
+
+  return (
+    <span
+      className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
+      style={{
+        background: active ? "var(--uz-success-bg)" : "var(--uz-bg-sunken)",
+        color: active ? "var(--uz-success)" : "var(--uz-text-muted)",
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
+/** Open-ended memberships have no end date and count as current. */
+function isActive(expiresAt: string | null, now: number): boolean {
+  if (expiresAt === null) return true;
+  // Before the clock is read, treat as current rather than flashing "expired".
+  if (now === 0) return true;
+  return new Date(expiresAt).getTime() > now;
 }

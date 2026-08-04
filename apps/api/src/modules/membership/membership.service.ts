@@ -69,10 +69,23 @@ export class MembershipService {
     });
   }
 
+  /**
+   * The public directory.
+   *
+   * Only members who chose to be listed, and only what a member would expect
+   * to be public about themselves: who they are, when they joined, and whether
+   * the membership is current. Deliberately not the application outcome —
+   * publishing that an organisation applied and was refused is not the
+   * association's to disclose. Staff see that in the admin queue instead.
+   */
   listDirectory() {
     return this.prisma.member.findMany({
       where: { isDirectoryListed: true },
-      include: {
+      select: {
+        id: true,
+        organization: true,
+        memberSince: true,
+        expiresAt: true,
         user: { select: { fullName: true } },
         membershipType: { select: { name: true } },
       },

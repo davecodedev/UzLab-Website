@@ -27,6 +27,7 @@ import {
 } from "./registry-data";
 import { exportCsv, exportXlsx, printPdf } from "./export-utils";
 import { RestrictedNotice } from "./RestrictedNotice";
+import { Pager, pageSlice } from "@/components/Pager";
 import {
   clearRecentSearches,
   loadRecentSearches,
@@ -60,6 +61,8 @@ const REG_VARS = {
   "--reg-font-sans": "'IBM Plex Sans', 'Onest', sans-serif",
   "--reg-font-mono": "'IBM Plex Mono', monospace",
 } as React.CSSProperties;
+
+const REGISTRY_PAGE_SIZE = 25;
 
 const STATUS_ORDER = ["ACCREDITED", "PENDING", "SUSPENDED", "EXPIRED", "WITHDRAWN"];
 
@@ -349,6 +352,17 @@ export function RegistryApp({ laboratories }: { laboratories: Laboratory[] }) {
     [rows, filters, keywordIds],
   );
 
+  const [page, setPage] = useState(1);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a new result set invalidates the current page
+    setPage(1);
+  }, [filters, keywordIds]);
+
+  const paged = useMemo(
+    () => pageSlice(filtered, page, REGISTRY_PAGE_SIZE),
+    [filtered, page],
+  );
+
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const lab of filtered) {
@@ -625,13 +639,24 @@ export function RegistryApp({ laboratories }: { laboratories: Laboratory[] }) {
             {filtered.length === 0 ? (
               <EmptyState lang={lang} onClear={clearAll} />
             ) : view === "table" ? (
-              <TableView lang={lang} laboratories={filtered} restricted={restricted} />
+              <TableView lang={lang} laboratories={paged} restricted={restricted} />
             ) : view === "cards" ? (
-              <CardsView lang={lang} laboratories={filtered} restricted={restricted} />
+              <CardsView lang={lang} laboratories={paged} restricted={restricted} />
             ) : view === "map" ? (
               <MapView rows={regionRows} maxCount={maxRegionCount} onSelect={(v) => updateFilter("region", v)} />
             ) : (
               <ChartView rows={sortedRegionRows} maxCount={maxRegionCount} />
+            )}
+
+            {/* Only the list views are paged. Map and chart summarise the whole
+                result set, so paging them would misrepresent it. */}
+            {(view === "table" || view === "cards") && (
+              <Pager
+                page={page}
+                pageSize={REGISTRY_PAGE_SIZE}
+                total={filtered.length}
+                onChange={setPage}
+              />
             )}
           </div>
         </div>
