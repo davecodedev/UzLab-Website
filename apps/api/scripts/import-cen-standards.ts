@@ -12,6 +12,7 @@
  * something the catalogue's readers filter on here, and it was explicitly not
  * asked for.
  */
+import { createHash } from 'node:crypto';
 import { PrismaClient, StandardRegister, StandardStatus } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import {
@@ -72,12 +73,46 @@ function dateOf(value: string): Date | undefined {
   return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
-function slugify(reference: string): string {
+function baseSlug(reference: string): string {
   const stem = reference
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
   return `cen-${stem || 'standard'}`;
+}
+
+/**
+ * Slugs have to be unique, and reducing a reference to lowercase alphanumerics
+ * does not preserve that: the catalogue writes the same document's parts with
+ * different punctuation, so two distinct references can land on one stem. The
+ * first run discovered this the hard way, half way through a write.
+ *
+ * Colliding stems get a short digest of the full reference appended — to *every*
+ * member of the colliding group, not just the later ones, so the result depends
+ * on the set of references and not on the order they were crawled in.
+ */
+function assignSlugs(records: ScrapedStandard[]): number {
+  const byStem = new Map<string, ScrapedStandard[]>();
+  for (const record of records) {
+    const stem = baseSlug(record.sourceId);
+    const group = byStem.get(stem);
+    if (group) group.push(record);
+    else byStem.set(stem, [record]);
+  }
+
+  let disambiguated = 0;
+  for (const [stem, group] of byStem) {
+    if (group.length === 1) {
+      group[0].slug = stem;
+      continue;
+    }
+    for (const record of group) {
+      const digest = createHash('sha1').update(record.sourceId).digest('hex').slice(0, 7);
+      record.slug = `${stem}-${digest}`;
+      disambiguated += 1;
+    }
+  }
+  return disambiguated;
 }
 
 function toRecord(row: CenRow): ScrapedStandard | null {
@@ -91,7 +126,8 @@ function toRecord(row: CenRow): ScrapedStandard | null {
 
   return {
     sourceId: reference,
-    slug: slugify(reference),
+    // Replaced by assignSlugs once the whole set is known.
+    slug: baseSlug(reference),
     data: {
       // The search application has no stable per-document URL that survives a
       // session, so readers are sent to the search itself.
@@ -178,12 +214,24 @@ async function scrape(): Promise<StandardScrapeResult> {
     );
   }
 
+  const records = [...byReference.values()];
+  const disambiguated = assignSlugs(records);
+
   console.log(
-    `${byReference.size.toLocaleString('en-GB')} distinct documents` +
+    `${records.length.toLocaleString('en-GB')} distinct documents` +
+      (disambiguated ? `, ${disambiguated} slug(s) disambiguated` : '') +
       (fetchFailures.length ? `, ${fetchFailures.length} committee(s) failed` : ''),
   );
 
-  return { records: [...byReference.values()], fetchFailures };
+  // A duplicate here would fail mid-write again, thousands of rows in.
+  const slugs = new Set(records.map((r) => r.slug));
+  if (slugs.size !== records.length) {
+    throw new Error(
+      `slug collision survived disambiguation: ${records.length} records, ${slugs.size} slugs`,
+    );
+  }
+
+  return { records, fetchFailures };
 }
 
 async function main() {
