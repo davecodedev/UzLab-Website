@@ -7,6 +7,7 @@ import { clearSession, getStoredUser, isStaff, type StoredUser } from "@/lib/aut
 import { useLang, pick, type Lang } from "@/lib/i18n";
 
 const NAV_DICT = {
+  toggleMenu: { ru: "Открыть меню", uz: "Menyuni ochish", en: "Toggle menu" },
   home: { ru: "Главная", uz: "Bosh sahifa", en: "Home" },
   about: { ru: "О нас", uz: "Biz haqimizda", en: "About" },
   membership: { ru: "Членство", uz: "A'zolik", en: "Membership" },
@@ -167,7 +168,7 @@ export function NavBar() {
 
         <button
           onClick={() => setMobileOpen((o) => !o)}
-          aria-label="Toggle menu"
+          aria-label={pick(NAV_DICT.toggleMenu, lang)}
           className="rounded-md p-1.5 lg:hidden"
           style={{ color: "var(--uz-text)" }}
         >

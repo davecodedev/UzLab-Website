@@ -1,22 +1,50 @@
+"use client";
+
+import { useLang, pick } from "@/lib/i18n";
+
 const TYPES = [
-  { value: "", label: "Everything" },
-  { value: "news", label: "News" },
-  { value: "member", label: "Members" },
-  { value: "laboratory", label: "Laboratories" },
+  { value: "", label: { ru: "Всё", uz: "Hammasi", en: "Everything" } },
+  { value: "news", label: { ru: "Новости", uz: "Yangiliklar", en: "News" } },
+  { value: "member", label: { ru: "Члены", uz: "A'zolar", en: "Members" } },
+  {
+    value: "laboratory",
+    label: { ru: "Лаборатории", uz: "Laboratoriyalar", en: "Laboratories" },
+  },
 ];
 
 const LAB_FIELDS = [
-  { value: "", label: "Any field" },
-  { value: "TESTING", label: "Testing" },
-  { value: "METROLOGY", label: "Metrology" },
-  { value: "MEDICINE", label: "Medicine" },
-  { value: "ECOLOGY", label: "Ecology" },
-  { value: "INDUSTRY", label: "Industry" },
-  { value: "AGRICULTURE", label: "Agriculture" },
-  { value: "FOOD", label: "Food" },
-  { value: "CONSTRUCTION", label: "Construction" },
-  { value: "OTHER", label: "Other" },
+  { value: "", label: { ru: "Любая область", uz: "Har qanday soha", en: "Any field" } },
+  { value: "TESTING", label: { ru: "Испытания", uz: "Sinov", en: "Testing" } },
+  { value: "METROLOGY", label: { ru: "Метрология", uz: "Metrologiya", en: "Metrology" } },
+  { value: "MEDICINE", label: { ru: "Медицина", uz: "Tibbiyot", en: "Medicine" } },
+  { value: "ECOLOGY", label: { ru: "Экология", uz: "Ekologiya", en: "Ecology" } },
+  { value: "INDUSTRY", label: { ru: "Промышленность", uz: "Sanoat", en: "Industry" } },
+  {
+    value: "AGRICULTURE",
+    label: { ru: "Сельское хозяйство", uz: "Qishloq xo'jaligi", en: "Agriculture" },
+  },
+  { value: "FOOD", label: { ru: "Пищевая продукция", uz: "Oziq-ovqat", en: "Food" } },
+  { value: "CONSTRUCTION", label: { ru: "Строительство", uz: "Qurilish", en: "Construction" } },
+  { value: "OTHER", label: { ru: "Прочее", uz: "Boshqa", en: "Other" } },
 ];
+
+const T = {
+  search: { ru: "Найти", uz: "Qidirish", en: "Search" },
+  type: { ru: "Тип", uz: "Turi", en: "Type" },
+  language: { ru: "Язык", uz: "Til", en: "Language" },
+  author: { ru: "Автор", uz: "Muallif", en: "Author" },
+  tags: { ru: "Теги", uz: "Teglar", en: "Tags" },
+  region: { ru: "Регион", uz: "Hudud", en: "Region" },
+  labField: { ru: "Область лаборатории", uz: "Laboratoriya sohasi", en: "Laboratory field" },
+  dateFrom: { ru: "Дата с", uz: "Sana dan", en: "Date from" },
+  dateTo: { ru: "Дата по", uz: "Sana gacha", en: "Date to" },
+  reset: { ru: "Сбросить", uz: "Tozalash", en: "Reset" },
+  queryPlaceholder: {
+    ru: "Поиск по сайту…",
+    uz: "Sayt bo'ylab qidirish…",
+    en: "Search the site…",
+  },
+} as const;
 
 export interface SearchFiltersValue {
   q?: string;
@@ -44,6 +72,7 @@ export function SearchFiltersForm({
   values: SearchFiltersValue;
   showType?: boolean;
 }) {
+  const { lang } = useLang();
   return (
     <form action={action} className="space-y-4">
       <div className="flex gap-2">
@@ -59,7 +88,7 @@ export function SearchFiltersForm({
           className="shrink-0 rounded-md px-4 py-2 text-sm font-semibold text-white"
           style={{ background: "var(--uz-blue-600)" }}
         >
-          Search
+          {pick(T.search, lang)}
         </button>
       </div>
 
@@ -67,7 +96,7 @@ export function SearchFiltersForm({
         {showType && (
           <div>
             <label className={labelClass} style={labelStyle}>
-              Type
+              {pick(T.type, lang)}
             </label>
             <select
               name="type"
@@ -77,7 +106,7 @@ export function SearchFiltersForm({
             >
               {TYPES.map((t) => (
                 <option key={t.value} value={t.value}>
-                  {t.label}
+                  {pick(t.label, lang)}
                 </option>
               ))}
             </select>
@@ -85,7 +114,7 @@ export function SearchFiltersForm({
         )}
         <div>
           <label className={labelClass} style={labelStyle}>
-            Language
+            {pick(T.language, lang)}
           </label>
           <input
             name="language"
@@ -97,7 +126,7 @@ export function SearchFiltersForm({
         </div>
         <div>
           <label className={labelClass} style={labelStyle}>
-            Author
+            {pick(T.author, lang)}
           </label>
           <input
             name="author"
@@ -108,7 +137,7 @@ export function SearchFiltersForm({
         </div>
         <div>
           <label className={labelClass} style={labelStyle}>
-            Tags
+            {pick(T.tags, lang)}
           </label>
           <input
             name="tags"
@@ -154,14 +183,14 @@ export function SearchFiltersForm({
           >
             {LAB_FIELDS.map((f) => (
               <option key={f.value} value={f.value}>
-                {f.label}
+                {pick(f.label, lang)}
               </option>
             ))}
           </select>
         </div>
         <div>
           <label className={labelClass} style={labelStyle}>
-            Region
+            {pick(T.region, lang)}
           </label>
           <input
             name="region"
