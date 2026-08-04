@@ -13,6 +13,8 @@
  * asked for.
  */
 import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { PrismaClient, StandardRegister, StandardStatus } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import {
@@ -41,8 +43,19 @@ import {
  * So it is by reference prefix, with the vocabulary of prefixes learned from
  * every committee that did *not* hit the ceiling. The catalogue's own data
  * decides what prefixes exist rather than a list written here going stale.
+ *
+ * A prefix can itself hold more than a thousand documents — three committees
+ * do — so a prefix that caps is narrowed a character at a time until nothing
+ * does. Reference matching is a case-insensitive substring test, so extending a
+ * fragment by every alphanumeric covers every reference that fragment could
+ * have matched: no reference ends at the fragment itself.
  */
 const MIN_PREFIX_SAMPLE = 20;
+
+const ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+
+/** Guards against a pathological branch; nothing real needs this many. */
+const MAX_REFINE_DEPTH = 4;
 
 /** Pause between searches. The source is a shared public service, not ours. */
 const DELAY_MS = 250;
@@ -165,7 +178,17 @@ function prefixOf(reference: string): string {
   return reference.trim().split(/\s+/)[0] ?? '';
 }
 
-async function scrape(): Promise<StandardScrapeResult> {
+/**
+ * Where a completed crawl is parked.
+ *
+ * The crawl takes hours, and twice now the write after it has failed — once on
+ * a slug collision, once because the connection had gone stale — costing the
+ * whole crawl each time. Parking the result means a failed write is retried in
+ * seconds against exactly the rows that were fetched.
+ */
+const CACHE_PATH = process.env.CEN_CACHE ?? '/tmp/uzlab-cen-scrape.json';
+
+async function crawl(): Promise<StandardScrapeResult> {
   const committees = await listCommitteeCodes();
   console.log(`${committees.length} technical committees to walk`);
 
@@ -231,20 +254,50 @@ async function scrape(): Promise<StandardScrapeResult> {
         `${vocabulary.length} reference prefixes`,
     );
 
-    for (const committee of cappedCommittees) {
-      let anyStillCapped = false;
-      for (const prefix of vocabulary) {
-        try {
-          const part = await search({ tcCode: committee.value, reference: prefix });
-          take(part.rows);
-          if (part.capped) anyStillCapped = true;
-        } catch (error) {
-          fetchFailures.push(`${committee.label} (${prefix}): ${(error as Error).message}`);
-        }
-        await sleep(DELAY_MS);
+    /**
+     * Searches one fragment, and if the source truncates, searches every
+     * one-character extension of it instead. Returns the fragments that were
+     * still truncated at the depth limit — an empty array means complete.
+     */
+    const walk = async (
+      committee: { value: string; label: string },
+      fragment: string,
+      depth: number,
+    ): Promise<string[]> => {
+      let result;
+      try {
+        result = await search({ tcCode: committee.value, reference: fragment });
+      } catch (error) {
+        fetchFailures.push(`${committee.label} (${fragment}): ${(error as Error).message}`);
+        return [];
       }
-      if (anyStillCapped) stillCapped.push(committee.label);
-      console.log(`  ${committee.label}: re-walked${anyStillCapped ? ' — STILL CAPPED' : ''}`);
+      take(result.rows);
+      await sleep(DELAY_MS);
+
+      if (!result.capped) return [];
+      if (depth >= MAX_REFINE_DEPTH) return [fragment];
+
+      const unresolved: string[] = [];
+      for (const character of ALPHABET) {
+        // The first narrowing crosses the space that follows every prefix
+        // ("EN" -> "EN 1"); deeper ones extend the number itself ("EN 1" ->
+        // "EN 10"), so the separator belongs only at the first level.
+        const next = depth === 0 ? `${fragment} ${character}` : `${fragment}${character}`;
+        unresolved.push(...(await walk(committee, next, depth + 1)));
+      }
+      return unresolved;
+    };
+
+    for (const committee of cappedCommittees) {
+      const unresolved: string[] = [];
+      for (const prefix of vocabulary) {
+        unresolved.push(...(await walk(committee, prefix, 0)));
+      }
+      if (unresolved.length) stillCapped.push(`${committee.label} (${unresolved.join(', ')})`);
+      console.log(
+        `  ${committee.label}: re-walked` +
+          (unresolved.length ? ` — STILL CAPPED on ${unresolved.length} fragment(s)` : ''),
+      );
     }
   }
 
@@ -284,7 +337,36 @@ async function scrape(): Promise<StandardScrapeResult> {
   return { records, fetchFailures };
 }
 
+/** JSON has no dates; Prisma wants them back as dates. */
+function reviveDates(result: StandardScrapeResult): StandardScrapeResult {
+  for (const record of result.records) {
+    for (const field of ['effectiveFrom', 'effectiveUntil'] as const) {
+      const value = record.data[field];
+      if (typeof value === 'string') record.data[field] = new Date(value);
+    }
+  }
+  return result;
+}
+
 async function main() {
+  const fromCache = process.argv.includes('--from-cache');
+
+  // Crawled before any connection is opened. `runStandardImport` writes its
+  // audit row first and queries again at the end, so a connection created up
+  // here would sit idle for the length of the crawl — which is how the last
+  // run lost its writes: the proxy dropped it, and the only error that
+  // surfaced was the audit update failing afterwards.
+  let result: StandardScrapeResult;
+  if (fromCache && existsSync(CACHE_PATH)) {
+    result = reviveDates(JSON.parse(readFileSync(CACHE_PATH, 'utf8')) as StandardScrapeResult);
+    console.log(`${result.records.length.toLocaleString('en-GB')} documents loaded from ${CACHE_PATH}`);
+  } else {
+    result = await crawl();
+    mkdirSync(dirname(CACHE_PATH), { recursive: true });
+    writeFileSync(CACHE_PATH, JSON.stringify(result));
+    console.log(`crawl parked at ${CACHE_PATH}`);
+  }
+
   const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
   const prisma = new PrismaClient({ adapter });
   const trigger = process.env.IMPORT_TRIGGER ?? 'manual';
@@ -293,7 +375,7 @@ async function main() {
   try {
     await runStandardImport(
       { prisma, register: StandardRegister.CEN, trigger, force },
-      scrape,
+      async () => result,
     );
   } finally {
     await prisma.$disconnect();
