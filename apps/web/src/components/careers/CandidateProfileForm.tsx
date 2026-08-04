@@ -5,22 +5,20 @@ import Link from "next/link";
 import { api, ApiError } from "@/lib/api";
 import { getAccessToken } from "@/lib/auth-client";
 import { useLang, pick } from "@/lib/i18n";
+import { CAREERS_PATH, type MyCandidateProfile } from "@/lib/careers";
 import {
-  CAREERS_PATH,
-  FIELD_LABELS,
-  FIELD_ORDER,
-  type LaboratoryField,
-  type MyCandidateProfile,
-} from "@/lib/careers";
+  CandidateFields,
+  EMPTY_CANDIDATE,
+  toCandidatePayload,
+  type CandidateFormState,
+} from "./candidate-fields";
 
 /**
- * The job seeker's own profile, so employers can find them rather than the
- * other way round.
+ * The profile a job seeker returns to after signing up.
  *
- * It stays hidden until the person publishes it, and the switch that publishes
- * it says plainly what becomes visible and to whom. This is the one place on
- * the site where a private individual types their own name and phone number
- * into a directory, so it is worth being unambiguous about.
+ * The same questions the registration flow asks, so the fields themselves live
+ * in `candidate-fields` and this is only the loading, saving and deleting
+ * around them.
  */
 
 const T = {
@@ -37,58 +35,11 @@ const T = {
   },
   signIn: { ru: "Войти", uz: "Kirish", en: "Sign in" },
   register: { ru: "Зарегистрироваться", uz: "Ro'yxatdan o'tish", en: "Create an account" },
-
   intro: {
     ru: "Расскажите о себе — работодатели смогут найти вас в каталоге специалистов.",
     uz: "O'zingiz haqingizda yozing — ish beruvchilar sizni mutaxassislar katalogidan topa oladi.",
     en: "Describe yourself, and employers will be able to find you in the specialist directory.",
   },
-  fullName: { ru: "Имя и фамилия", uz: "Ism va familiya", en: "Full name" },
-  headline: { ru: "Кратко о себе", uz: "O'zingiz haqingizda qisqacha", en: "Headline" },
-  headlinePlaceholder: {
-    ru: "Инженер-химик, испытания воды",
-    uz: "Muhandis-kimyogar, suv sinovlari",
-    en: "Chemical engineer, water testing",
-  },
-  region: { ru: "Регион", uz: "Hudud", en: "Region" },
-  city: { ru: "Город", uz: "Shahar", en: "City" },
-  fields: { ru: "Области работы", uz: "Ish sohalari", en: "Fields of work" },
-  years: { ru: "Опыт, лет", uz: "Tajriba, yil", en: "Years of experience" },
-  summary: { ru: "О себе", uz: "O'zim haqimda", en: "About you" },
-  summaryHint: {
-    ru: "Чем занимались, с каким оборудованием и методами работали.",
-    uz: "Nima ish qilgansiz, qanday uskuna va usullar bilan ishlagansiz.",
-    en: "What you have worked on, with what equipment and methods.",
-  },
-  skills: { ru: "Навыки", uz: "Ko'nikmalar", en: "Skills" },
-  skillsHint: {
-    ru: "Через запятую — например: ВЭЖХ, ISO/IEC 17025, валидация методик",
-    uz: "Vergul bilan — masalan: YUSSX, ISO/IEC 17025, metodikalarni validatsiya qilish",
-    en: "Comma separated — for example: HPLC, ISO/IEC 17025, method validation",
-  },
-  education: { ru: "Образование", uz: "Ta'lim", en: "Education" },
-  certifications: { ru: "Сертификаты", uz: "Sertifikatlar", en: "Certifications" },
-  cvUrl: { ru: "Ссылка на резюме", uz: "Rezyume havolasi", en: "Link to your CV" },
-  contactEmail: { ru: "E-mail для связи", uz: "Bog'lanish uchun e-mail", en: "Contact e-mail" },
-  contactPhone: { ru: "Телефон", uz: "Telefon", en: "Phone" },
-  optional: { ru: "необязательно", uz: "ixtiyoriy", en: "optional" },
-
-  openToWork: {
-    ru: "Сейчас рассматриваю предложения",
-    uz: "Hozir takliflarni ko'rib chiqyapman",
-    en: "Currently open to offers",
-  },
-  publishSwitch: {
-    ru: "Показывать мой профиль работодателям",
-    uz: "Profilimni ish beruvchilarga ko'rsatish",
-    en: "Show my profile to employers",
-  },
-  privacyNote: {
-    ru: "Пока переключатель выключен, профиль виден только вам. После включения ваше имя и контакты видят вошедшие в систему пользователи; всем остальным профиль показывается без имени и контактов.",
-    uz: "Kalit o'chirilgan bo'lsa, profilni faqat siz ko'rasiz. Yoqilgandan so'ng ismingiz va kontaktlaringizni tizimga kirgan foydalanuvchilar ko'radi; qolganlarga profil ism va kontaktlarsiz ko'rsatiladi.",
-    en: "While the switch is off, only you can see the profile. Once it is on, your name and contact details are visible to signed-in users; everyone else sees the profile without them.",
-  },
-
   save: { ru: "Сохранить профиль", uz: "Profilni saqlash", en: "Save profile" },
   saving: { ru: "Сохраняем…", uz: "Saqlanmoqda…", en: "Saving…" },
   saved: { ru: "Профиль сохранён.", uz: "Profil saqlandi.", en: "Profile saved." },
@@ -106,39 +57,12 @@ const T = {
   loading: { ru: "Загрузка…", uz: "Yuklanmoqda…", en: "Loading…" },
 } as const;
 
-const inputClass = "w-full rounded-md border px-3 py-2 text-sm outline-none";
-const inputStyle = {
-  borderColor: "var(--uz-border)",
-  background: "#ffffff",
-  color: "var(--uz-text)",
-} as const;
-const labelClass = "mb-1 block text-[13px] font-semibold";
-const labelStyle = { color: "var(--uz-text)" } as const;
-
-const EMPTY = {
-  fullName: "",
-  headline: "",
-  region: "",
-  city: "",
-  fields: [] as LaboratoryField[],
-  yearsExperience: "",
-  summary: "",
-  skills: "",
-  education: "",
-  certifications: "",
-  cvUrl: "",
-  contactEmail: "",
-  contactPhone: "",
-  openToWork: true,
-  published: false,
-};
-
 export function CandidateProfileForm() {
   const { lang } = useLang();
   const [token, setToken] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState(EMPTY);
+  const [form, setForm] = useState<CandidateFormState>(EMPTY_CANDIDATE);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -189,18 +113,12 @@ export function CandidateProfileForm() {
     if (ready) load();
   }, [ready, load]);
 
-  function set<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
-    setForm((f) => ({ ...f, [key]: value }));
-  }
-
-  function toggleField(field: LaboratoryField) {
-    setForm((f) => ({
-      ...f,
-      fields: f.fields.includes(field)
-        ? f.fields.filter((x) => x !== field)
-        : [...f.fields, field],
-    }));
-  }
+  const set = useCallback(
+    <K extends keyof CandidateFormState>(key: K, value: CandidateFormState[K]) => {
+      setForm((f) => ({ ...f, [key]: value }));
+    },
+    [],
+  );
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -210,26 +128,7 @@ export function CandidateProfileForm() {
     try {
       await api.put(
         `${CAREERS_PATH}/candidates/me`,
-        {
-          fullName: form.fullName,
-          headline: form.headline,
-          region: form.region || undefined,
-          city: form.city || undefined,
-          fields: form.fields,
-          yearsExperience: form.yearsExperience ? Number(form.yearsExperience) : undefined,
-          summary: form.summary,
-          skills: form.skills
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean),
-          education: form.education || undefined,
-          certifications: form.certifications || undefined,
-          cvUrl: form.cvUrl || undefined,
-          contactEmail: form.contactEmail,
-          contactPhone: form.contactPhone || undefined,
-          openToWork: form.openToWork,
-          visibility: form.published ? "PUBLISHED" : "HIDDEN",
-        },
+        toCandidatePayload(form),
         getAccessToken() ?? undefined,
       );
       setDone(true);
@@ -243,7 +142,7 @@ export function CandidateProfileForm() {
   async function handleDelete() {
     if (!window.confirm(pick(T.removeConfirm, lang))) return;
     await api.del(`${CAREERS_PATH}/candidates/me`, getAccessToken() ?? undefined);
-    setForm(EMPTY);
+    setForm(EMPTY_CANDIDATE);
     setDone(false);
   }
 
@@ -260,7 +159,10 @@ export function CandidateProfileForm() {
           <p className="text-[15px] font-bold" style={{ color: "var(--uz-navy-900)" }}>
             {pick(T.signInHeading, lang)}
           </p>
-          <p className="mx-auto mt-2 max-w-[52ch] text-[13px]" style={{ color: "var(--uz-text-muted)" }}>
+          <p
+            className="mx-auto mt-2 max-w-[52ch] text-[13px]"
+            style={{ color: "var(--uz-text-muted)" }}
+          >
             {pick(T.signInBody, lang)}
           </p>
           <div className="mt-5 flex justify-center gap-3">
@@ -271,8 +173,9 @@ export function CandidateProfileForm() {
             >
               {pick(T.signIn, lang)}
             </Link>
+            {/* Straight to the specialist path, so the sign-up asks the right questions. */}
             <Link
-              href="/register"
+              href="/register?as=seeker"
               className="rounded-lg px-5 py-2.5 text-sm font-semibold"
               style={{ border: "1px solid var(--uz-border)", color: "var(--uz-text)" }}
             >
@@ -307,189 +210,7 @@ export function CandidateProfileForm() {
         className="space-y-4 rounded-xl border bg-white p-6"
         style={{ borderColor: "var(--uz-border)", boxShadow: "var(--uz-shadow-sm)" }}
       >
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label={pick(T.fullName, lang)}>
-            <input
-              required
-              value={form.fullName}
-              onChange={(e) => set("fullName", e.target.value)}
-              className={inputClass}
-              style={inputStyle}
-            />
-          </Field>
-          <Field label={`${pick(T.years, lang)} · ${pick(T.optional, lang)}`}>
-            <input
-              type="number"
-              min={0}
-              max={60}
-              value={form.yearsExperience}
-              onChange={(e) => set("yearsExperience", e.target.value)}
-              className={inputClass}
-              style={inputStyle}
-            />
-          </Field>
-        </div>
-
-        <Field label={pick(T.headline, lang)}>
-          <input
-            required
-            minLength={4}
-            value={form.headline}
-            onChange={(e) => set("headline", e.target.value)}
-            placeholder={pick(T.headlinePlaceholder, lang)}
-            className={inputClass}
-            style={inputStyle}
-          />
-        </Field>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label={`${pick(T.region, lang)} · ${pick(T.optional, lang)}`}>
-            <input
-              value={form.region}
-              onChange={(e) => set("region", e.target.value)}
-              className={inputClass}
-              style={inputStyle}
-            />
-          </Field>
-          <Field label={`${pick(T.city, lang)} · ${pick(T.optional, lang)}`}>
-            <input
-              value={form.city}
-              onChange={(e) => set("city", e.target.value)}
-              className={inputClass}
-              style={inputStyle}
-            />
-          </Field>
-        </div>
-
-        <fieldset>
-          <legend className={labelClass} style={labelStyle}>
-            {pick(T.fields, lang)}
-          </legend>
-          <div className="mt-1 grid grid-cols-1 gap-x-5 gap-y-2 sm:grid-cols-3">
-            {FIELD_ORDER.map((field) => (
-              <label key={field} className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={form.fields.includes(field)}
-                  onChange={() => toggleField(field)}
-                  className="h-4 w-4"
-                  style={{ accentColor: "var(--uz-blue-600)" }}
-                />
-                <span style={{ color: "var(--uz-text)" }}>{pick(FIELD_LABELS[field], lang)}</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
-
-        <Field label={pick(T.summary, lang)}>
-          <textarea
-            required
-            rows={5}
-            minLength={40}
-            value={form.summary}
-            onChange={(e) => set("summary", e.target.value)}
-            className={inputClass}
-            style={inputStyle}
-          />
-          <p className="mt-1 text-xs" style={{ color: "var(--uz-text-faint)" }}>
-            {pick(T.summaryHint, lang)}
-          </p>
-        </Field>
-
-        <Field label={`${pick(T.skills, lang)} · ${pick(T.optional, lang)}`}>
-          <input
-            value={form.skills}
-            onChange={(e) => set("skills", e.target.value)}
-            className={inputClass}
-            style={inputStyle}
-          />
-          <p className="mt-1 text-xs" style={{ color: "var(--uz-text-faint)" }}>
-            {pick(T.skillsHint, lang)}
-          </p>
-        </Field>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label={`${pick(T.education, lang)} · ${pick(T.optional, lang)}`}>
-            <textarea
-              rows={2}
-              value={form.education}
-              onChange={(e) => set("education", e.target.value)}
-              className={inputClass}
-              style={inputStyle}
-            />
-          </Field>
-          <Field label={`${pick(T.certifications, lang)} · ${pick(T.optional, lang)}`}>
-            <textarea
-              rows={2}
-              value={form.certifications}
-              onChange={(e) => set("certifications", e.target.value)}
-              className={inputClass}
-              style={inputStyle}
-            />
-          </Field>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label={pick(T.contactEmail, lang)}>
-            <input
-              required
-              type="email"
-              value={form.contactEmail}
-              onChange={(e) => set("contactEmail", e.target.value)}
-              className={inputClass}
-              style={inputStyle}
-            />
-          </Field>
-          <Field label={`${pick(T.contactPhone, lang)} · ${pick(T.optional, lang)}`}>
-            <input
-              value={form.contactPhone}
-              onChange={(e) => set("contactPhone", e.target.value)}
-              className={inputClass}
-              style={inputStyle}
-            />
-          </Field>
-        </div>
-
-        <Field label={`${pick(T.cvUrl, lang)} · ${pick(T.optional, lang)}`}>
-          <input
-            type="url"
-            value={form.cvUrl}
-            onChange={(e) => set("cvUrl", e.target.value)}
-            placeholder="https://…"
-            className={inputClass}
-            style={inputStyle}
-          />
-        </Field>
-
-        <label className="flex items-center gap-2.5 text-sm" style={{ color: "var(--uz-text)" }}>
-          <input
-            type="checkbox"
-            checked={form.openToWork}
-            onChange={(e) => set("openToWork", e.target.checked)}
-            className="h-4 w-4"
-            style={{ accentColor: "var(--uz-blue-600)" }}
-          />
-          {pick(T.openToWork, lang)}
-        </label>
-
-        <div
-          className="rounded-lg px-4 py-3"
-          style={{ background: "var(--uz-bg-sunken)", border: "1px solid var(--uz-border)" }}
-        >
-          <label className="flex items-center gap-2.5 text-sm font-semibold" style={{ color: "var(--uz-text)" }}>
-            <input
-              type="checkbox"
-              checked={form.published}
-              onChange={(e) => set("published", e.target.checked)}
-              className="h-4 w-4"
-              style={{ accentColor: "var(--uz-blue-600)" }}
-            />
-            {pick(T.publishSwitch, lang)}
-          </label>
-          <p className="mt-1.5 text-xs leading-relaxed" style={{ color: "var(--uz-text-muted)" }}>
-            {pick(T.privacyNote, lang)}
-          </p>
-        </div>
+        <CandidateFields form={form} set={set} />
 
         {error && (
           <p className="text-sm" style={{ color: "var(--uz-danger-fg, #b42318)" }}>
@@ -525,22 +246,14 @@ export function CandidateProfileForm() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className={labelClass} style={labelStyle}>
-        {label}
-      </label>
-      {children}
-    </div>
-  );
-}
-
 function Kicker({ label }: { label: string }) {
   return (
     <div className="mb-3.5 flex items-center gap-2.5">
       <span className="uz-slash inline-block h-5 w-2" style={{ background: "var(--uz-blue-600)" }} />
-      <span className="text-[13px] font-bold tracking-[1.5px]" style={{ color: "var(--uz-navy-800)" }}>
+      <span
+        className="text-[13px] font-bold tracking-[1.5px]"
+        style={{ color: "var(--uz-navy-800)" }}
+      >
         {label}
       </span>
     </div>

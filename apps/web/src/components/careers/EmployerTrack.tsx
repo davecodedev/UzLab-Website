@@ -163,7 +163,7 @@ export function EmployerTrack() {
               {pick(T.signIn, lang)}
             </Link>
             <Link
-              href="/register"
+              href="/register?as=employer"
               className="rounded-lg px-5 py-2.5 text-sm font-semibold"
               style={{ border: "1px solid var(--uz-border)", color: "var(--uz-text)" }}
             >
