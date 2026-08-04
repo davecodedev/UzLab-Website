@@ -486,6 +486,7 @@ enum StandardRegister {
   MGS // mgscatalog.by — EASC interstate (GOST) catalogue, published from Belarus
   UZSTI // uzsti.uz — O'zbekiston Standartlar Instituti
   ISO // iso.org open data — published under ODC-By v1.0, not scraped
+  CEN // standards.cencenelec.eu — the CEN and CENELEC European catalogues
 }
 
 // Each catalogue words its own state differently ("Введен впервые", "Заменен",

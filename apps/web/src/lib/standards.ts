@@ -11,7 +11,7 @@
 
 export const STANDARDS_PATH = "/standards";
 
-export type StandardRegister = "MGS" | "UZSTI" | "ISO";
+export type StandardRegister = "MGS" | "UZSTI" | "ISO" | "CEN";
 
 export type StandardStatus =
   | "IN_FORCE"
@@ -134,6 +134,11 @@ export const REGISTER_LABELS: Record<StandardRegister, { ru: string; uz: string;
     ru: "Международные стандарты (ISO)",
     uz: "Xalqaro standartlar (ISO)",
     en: "International standards (ISO)",
+  },
+  CEN: {
+    ru: "Европейские стандарты (CEN/CENELEC)",
+    uz: "Yevropa standartlari (CEN/CENELEC)",
+    en: "European standards (CEN/CENELEC)",
   },
 };
 
