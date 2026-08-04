@@ -810,7 +810,16 @@ model CandidateProfile {
   education       String?
   certifications  String?
 
+  /// A link to a CV hosted elsewhere.
   cvUrl String?
+
+  /// An uploaded CV, stored the same way laboratory documents are. Held beside
+  /// `cvUrl` rather than replacing it: some people have a file, some have a
+  /// profile page somewhere, and there is no reason to make them choose.
+  cvFilename  String?
+  cvMimeType  String?
+  cvSizeBytes Int?
+  cvData      Bytes?
 
   /// Withheld from anyone not signed in.
   contactEmail String

@@ -202,6 +202,9 @@ export interface Candidate {
   education?: string | null;
   certifications?: string | null;
   cvUrl?: string | null;
+  /** Present only when the caller is signed in and a file was uploaded. */
+  cvFilename?: string | null;
+  cvSizeBytes?: number | null;
   contactEmail?: string;
   contactPhone?: string | null;
 }

@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, uploadFile } from "@/lib/api";
 import { storeSession, getAccessToken } from "@/lib/auth-client";
 import { AuthShell, AuthInput } from "@/components/AuthShell";
 import { useLang, pick } from "@/lib/i18n";
@@ -129,6 +129,7 @@ function RegisterFlow() {
   const [error, setError] = useState<string | null>(null);
 
   const [profile, setProfile] = useState<CandidateFormState>(EMPTY_CANDIDATE);
+  const [cvFile, setCvFile] = useState<File | null>(null);
 
   const setProfileField = useCallback(
     <K extends keyof CandidateFormState>(key: K, value: CandidateFormState[K]) => {
@@ -176,6 +177,13 @@ function RegisterFlow() {
         toCandidatePayload(profile),
         getAccessToken() ?? undefined,
       );
+      // Second request: the file needs the profile row that the save above
+      // has only just created.
+      if (cvFile) {
+        await uploadFile(`${CAREERS_PATH}/candidates/me/cv`, cvFile, {
+          token: getAccessToken() ?? "",
+        });
+      }
       router.push(next ?? "/career");
     } catch (err) {
       setError(err instanceof ApiError && err.message ? err.message : pick(T.saveFailed, lang));
@@ -334,7 +342,13 @@ function RegisterFlow() {
         style={{ borderColor: "var(--uz-border)", boxShadow: "var(--uz-shadow-sm)" }}
       >
         {/* The name and e-mail were asked for on the previous step. */}
-        <CandidateFields form={profile} set={setProfileField} hideIdentity />
+        <CandidateFields
+          form={profile}
+          set={setProfileField}
+          hideIdentity
+          cvFile={cvFile}
+          onCvFile={setCvFile}
+        />
 
         {error && (
           <p className="text-sm" style={{ color: "var(--uz-danger-fg, #b42318)" }}>

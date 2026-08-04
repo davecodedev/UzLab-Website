@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, uploadFile } from "@/lib/api";
 import { getAccessToken } from "@/lib/auth-client";
 import { useLang, pick } from "@/lib/i18n";
 import { CAREERS_PATH, type MyCandidateProfile } from "@/lib/careers";
@@ -66,6 +66,8 @@ export function CandidateProfileForm() {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cvFile, setCvFile] = useState<File | null>(null);
+  const [savedCvName, setSavedCvName] = useState<string | null>(null);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the token lives in the browser
@@ -83,6 +85,7 @@ export function CandidateProfileForm() {
       .get<MyCandidateProfile | null>(`${CAREERS_PATH}/candidates/me`, t)
       .then((profile) => {
         if (!profile) return;
+        setSavedCvName(profile.cvFilename ?? null);
         setForm({
           fullName: profile.fullName,
           headline: profile.headline,
@@ -131,6 +134,16 @@ export function CandidateProfileForm() {
         toCandidatePayload(form),
         getAccessToken() ?? undefined,
       );
+
+      // The upload is a second request because it needs a profile row to
+      // attach to, which a first-time save has only just created.
+      if (cvFile) {
+        await uploadFile(`${CAREERS_PATH}/candidates/me/cv`, cvFile, {
+          token: getAccessToken() ?? "",
+        });
+        setSavedCvName(cvFile.name);
+        setCvFile(null);
+      }
       setDone(true);
     } catch (e) {
       setError(e instanceof ApiError && e.message ? e.message : pick(T.failed, lang));
@@ -139,10 +152,17 @@ export function CandidateProfileForm() {
     }
   }
 
+  async function handleRemoveCv() {
+    await api.del(`${CAREERS_PATH}/candidates/me/cv`, getAccessToken() ?? undefined);
+    setSavedCvName(null);
+  }
+
   async function handleDelete() {
     if (!window.confirm(pick(T.removeConfirm, lang))) return;
     await api.del(`${CAREERS_PATH}/candidates/me`, getAccessToken() ?? undefined);
     setForm(EMPTY_CANDIDATE);
+    setSavedCvName(null);
+    setCvFile(null);
     setDone(false);
   }
 
@@ -210,7 +230,14 @@ export function CandidateProfileForm() {
         className="space-y-4 rounded-xl border bg-white p-6"
         style={{ borderColor: "var(--uz-border)", boxShadow: "var(--uz-shadow-sm)" }}
       >
-        <CandidateFields form={form} set={set} />
+        <CandidateFields
+          form={form}
+          set={set}
+          cvFile={cvFile}
+          onCvFile={setCvFile}
+          savedCvName={savedCvName}
+          onRemoveSavedCv={() => void handleRemoveCv()}
+        />
 
         {error && (
           <p className="text-sm" style={{ color: "var(--uz-danger-fg, #b42318)" }}>

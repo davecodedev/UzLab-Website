@@ -75,6 +75,21 @@ export const CANDIDATE_T = {
   education: { ru: "Образование", uz: "Ta'lim", en: "Education" },
   certifications: { ru: "Сертификаты", uz: "Sertifikatlar", en: "Certifications" },
   cvUrl: { ru: "Ссылка на резюме", uz: "Rezyume havolasi", en: "Link to your CV" },
+  cvFile: { ru: "Файл резюме", uz: "Rezyume fayli", en: "CV file" },
+  cvFileHint: {
+    ru: "PDF или Word, до 5 МБ. Файл видят только вошедшие в систему пользователи.",
+    uz: "PDF yoki Word, 5 MB gacha. Faylni faqat tizimga kirgan foydalanuvchilar ko'radi.",
+    en: "PDF or Word, up to 5 MB. Only signed-in users can open it.",
+  },
+  cvOr: { ru: "или", uz: "yoki", en: "or" },
+  cvChoose: { ru: "Выбрать файл", uz: "Fayl tanlash", en: "Choose a file" },
+  cvReplace: { ru: "Заменить файл", uz: "Faylni almashtirish", en: "Replace file" },
+  cvRemove: { ru: "Удалить файл", uz: "Faylni o'chirish", en: "Remove file" },
+  cvPending: {
+    ru: "будет загружен при сохранении",
+    uz: "saqlashda yuklanadi",
+    en: "will be uploaded when you save",
+  },
   contactEmail: { ru: "E-mail для связи", uz: "Bog'lanish uchun e-mail", en: "Contact e-mail" },
   contactPhone: { ru: "Телефон", uz: "Telefon", en: "Phone" },
   optional: { ru: "необязательно", uz: "ixtiyoriy", en: "optional" },
@@ -133,10 +148,20 @@ export function CandidateFields({
   set,
   /** The registration flow already asked for the name and e-mail. */
   hideIdentity = false,
+  cvFile,
+  onCvFile,
+  savedCvName,
+  onRemoveSavedCv,
 }: {
   form: CandidateFormState;
   set: <K extends keyof CandidateFormState>(key: K, value: CandidateFormState[K]) => void;
   hideIdentity?: boolean;
+  /** Chosen but not yet sent — the upload needs a saved profile to attach to. */
+  cvFile?: File | null;
+  onCvFile?: (file: File | null) => void;
+  /** The filename already stored, if any. */
+  savedCvName?: string | null;
+  onRemoveSavedCv?: () => void;
 }) {
   const { lang } = useLang();
   const t = <K extends keyof typeof CANDIDATE_T>(key: K) => pick(CANDIDATE_T[key], lang);
@@ -299,16 +324,73 @@ export function CandidateFields({
         </Field>
       </div>
 
-      <Field label={`${t("cvUrl")} · ${t("optional")}`}>
+      <div>
+        <label className={labelClass} style={labelStyle}>
+          {t("cvFile")} · {t("optional")}
+        </label>
+
+        {onCvFile && (
+          <div className="flex flex-wrap items-center gap-3">
+            <label
+              className="cursor-pointer rounded-md px-3 py-1.5 text-[13px] font-semibold"
+              style={{ border: "1px solid var(--uz-border-strong)", color: "var(--uz-text)" }}
+            >
+              {savedCvName || cvFile ? t("cvReplace") : t("cvChoose")}
+              <input
+                type="file"
+                accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                className="hidden"
+                onChange={(e) => onCvFile(e.target.files?.[0] ?? null)}
+              />
+            </label>
+
+            {cvFile && (
+              <span className="text-[13px]" style={{ color: "var(--uz-text)" }}>
+                {cvFile.name}{" "}
+                <span style={{ color: "var(--uz-text-faint)" }}>({t("cvPending")})</span>
+              </span>
+            )}
+
+            {!cvFile && savedCvName && (
+              <>
+                <span className="text-[13px]" style={{ color: "var(--uz-text)" }}>
+                  {savedCvName}
+                </span>
+                {onRemoveSavedCv && (
+                  <button
+                    type="button"
+                    onClick={onRemoveSavedCv}
+                    className="text-[13px] font-semibold underline underline-offset-2"
+                    style={{ color: "var(--uz-text-muted)" }}
+                  >
+                    {t("cvRemove")}
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        <p className="mt-1 text-xs" style={{ color: "var(--uz-text-faint)" }}>
+          {t("cvFileHint")}
+        </p>
+
+        <p className="mt-2 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--uz-text-faint)" }}>
+          {t("cvOr")}
+        </p>
         <input
           type="url"
           value={form.cvUrl}
           onChange={(e) => set("cvUrl", e.target.value)}
           placeholder="https://…"
-          className={inputClass}
+          className={`mt-1 ${inputClass}`}
           style={inputStyle}
+          aria-label={t("cvUrl")}
         />
-      </Field>
+        <p className="mt-1 text-xs" style={{ color: "var(--uz-text-faint)" }}>
+          {t("cvUrl")}
+        </p>
+      </div>
 
       <label className="flex items-center gap-2.5 text-sm" style={{ color: "var(--uz-text)" }}>
         <input

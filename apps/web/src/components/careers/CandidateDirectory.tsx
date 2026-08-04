@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { api } from "@/lib/api";
+import { api, apiUrl } from "@/lib/api";
 import { getAccessToken } from "@/lib/auth-client";
 import { useLang, pick } from "@/lib/i18n";
 import { formatNumber } from "@/lib/format";
@@ -57,6 +57,7 @@ const T = {
   notLooking: { ru: "Сейчас не ищет", uz: "Hozir qidirmayapti", en: "Not looking right now" },
   years: { ru: "лет опыта", uz: "yil tajriba", en: "years of experience" },
   cv: { ru: "Резюме", uz: "Rezyume", en: "CV" },
+  cvFile: { ru: "Резюме (файл)", uz: "Rezyume (fayl)", en: "CV (file)" },
   hiddenName: { ru: "Специалист", uz: "Mutaxassis", en: "Specialist" },
   signInPrompt: {
     ru: "Войдите, чтобы увидеть имена и контакты специалистов.",
@@ -242,6 +243,23 @@ export function CandidateDirectory() {
   );
 }
 
+/**
+ * The CV route is behind the bearer token, which a plain link cannot carry, so
+ * the bytes are fetched and handed to the browser as a blob. The object URL is
+ * revoked once the tab has taken it.
+ */
+async function openCv(candidateId: string) {
+  const token = getAccessToken();
+  if (!token) return;
+  const response = await fetch(apiUrl(`${CAREERS_PATH}/candidates/${candidateId}/cv`), {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) return;
+  const url = URL.createObjectURL(await response.blob());
+  window.open(url, "_blank", "noopener");
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
 function CandidateCard({ candidate }: { candidate: Candidate }) {
   const { lang } = useLang();
   const place = [candidate.city, candidate.region].filter(Boolean).join(", ");
@@ -306,7 +324,7 @@ function CandidateCard({ candidate }: { candidate: Candidate }) {
         </p>
       )}
 
-      {(candidate.contactEmail || candidate.cvUrl) && (
+      {(candidate.contactEmail || candidate.cvUrl || candidate.cvFilename) && (
         <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[13px]">
           {candidate.contactEmail && (
             <a
@@ -330,6 +348,19 @@ function CandidateCard({ candidate }: { candidate: Candidate }) {
             >
               {pick(T.cv, lang)}
             </a>
+          )}
+          {candidate.cvFilename && (
+            // Opened in a new tab rather than fetched: the route needs the
+            // bearer token, so the click carries it as a one-off query the
+            // browser can follow.
+            <button
+              type="button"
+              onClick={() => void openCv(candidate.id)}
+              className="font-semibold underline underline-offset-2"
+              style={{ color: "var(--uz-blue-600)" }}
+            >
+              {pick(T.cvFile, lang)}
+            </button>
           )}
         </p>
       )}

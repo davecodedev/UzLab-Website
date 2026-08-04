@@ -8,9 +8,14 @@ import {
   Post,
   Put,
   Query,
+  Res,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
-import { CareersService } from './careers.service.js';
+import { FileInterceptor } from '@nestjs/platform-express';
+import type { Response } from 'express';
+import { CareersService, MAX_CV_BYTES } from './careers.service.js';
 import {
   ApplyDto,
   CreateVacancyDto,
@@ -119,6 +124,45 @@ export class CareersController {
   @Delete('candidates/me')
   deleteCandidateProfile(@CurrentUser() user: { id: string }) {
     return this.careers.deleteCandidateProfile(user.id);
+  }
+
+  @Throttle({ default: THROTTLE_BULK })
+  @UseGuards(JwtAuthGuard)
+  @Post('candidates/me/cv')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_CV_BYTES } }))
+  uploadCv(
+    @CurrentUser() user: { id: string },
+    @UploadedFile()
+    file: { buffer: Buffer; originalname: string; mimetype: string; size: number },
+  ) {
+    return this.careers.saveCv(user.id, file);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('candidates/me/cv')
+  removeCv(@CurrentUser() user: { id: string }) {
+    return this.careers.deleteCv(user.id);
+  }
+
+  /**
+   * Downloading someone's CV requires an account, for the same reason their
+   * e-mail does: it is theirs, and the open web is not the audience.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get('candidates/:id/cv')
+  async downloadCv(
+    @Param('id') id: string,
+    @CurrentUser() user: { id: string },
+    @Res() res: Response,
+  ) {
+    const cv = await this.careers.getCv(id, user.id);
+    res.setHeader('Content-Type', cv.mimeType);
+    res.setHeader('Content-Length', String(cv.data.length));
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename="${cv.filename.replace(/[^\w.-]/g, '_')}"`,
+    );
+    res.end(Buffer.from(cv.data));
   }
 
   // --- Employers -----------------------------------------------------------

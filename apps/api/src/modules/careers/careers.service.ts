@@ -1,4 +1,9 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CandidateVisibility, Prisma, VacancyStatus } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
 import { slugify } from '../../common/utils/slugify.js';
@@ -360,6 +365,86 @@ export class CareersService {
     return { items, total, page, pageSize: CANDIDATE_PAGE_SIZE, identified };
   }
 
+  /**
+   * Stores the uploaded CV against the profile, replacing whatever was there.
+   *
+   * Requires the profile to exist: the upload is a second step after the
+   * details are saved, so there is nothing to attach a file to before then.
+   */
+  async saveCv(
+    userId: string,
+    file: { buffer: Buffer; originalname: string; mimetype: string; size: number },
+  ) {
+    if (!file?.buffer?.length) throw new BadRequestException('No file was uploaded.');
+    if (file.size > MAX_CV_BYTES) {
+      throw new BadRequestException(
+        `File is ${(file.size / 1024 / 1024).toFixed(1)} MB; the limit is ${MAX_CV_BYTES / 1024 / 1024} MB.`,
+      );
+    }
+    if (!ALLOWED_CV_TYPES.has(file.mimetype)) {
+      throw new BadRequestException('Please upload a PDF or Word document.');
+    }
+
+    const profile = await this.prisma.candidateProfile.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+    if (!profile) {
+      throw new BadRequestException('Save your details before uploading a CV.');
+    }
+
+    await this.prisma.candidateProfile.update({
+      where: { userId },
+      data: {
+        cvFilename: file.originalname.slice(0, 255),
+        cvMimeType: file.mimetype,
+        cvSizeBytes: file.size,
+        cvData: new Uint8Array(file.buffer),
+      },
+    });
+    return { filename: file.originalname, sizeBytes: file.size };
+  }
+
+  async deleteCv(userId: string) {
+    await this.prisma.candidateProfile.updateMany({
+      where: { userId },
+      data: { cvFilename: null, cvMimeType: null, cvSizeBytes: null, cvData: null },
+    });
+    return { deleted: true };
+  }
+
+  /**
+   * The bytes, for download.
+   *
+   * Only a published profile's CV is readable by someone else, and only the
+   * owner can read their own while it is still hidden. Being signed in is
+   * checked by the guard on the route; this is the rest of it.
+   */
+  async getCv(candidateId: string, requesterId: string) {
+    const profile = await this.prisma.candidateProfile.findUnique({
+      where: { id: candidateId },
+      select: {
+        userId: true,
+        visibility: true,
+        cvData: true,
+        cvFilename: true,
+        cvMimeType: true,
+      },
+    });
+    if (!profile?.cvData) throw new NotFoundException('No CV on file.');
+
+    const isOwner = profile.userId === requesterId;
+    if (!isOwner && profile.visibility !== CandidateVisibility.PUBLISHED) {
+      throw new ForbiddenException('This profile is not published.');
+    }
+
+    return {
+      data: profile.cvData,
+      filename: profile.cvFilename ?? 'cv.pdf',
+      mimeType: profile.cvMimeType ?? 'application/pdf',
+    };
+  }
+
   /** Regions and fields that actually have published candidates. */
   async candidateFacets() {
     const where = { visibility: CandidateVisibility.PUBLISHED };
@@ -412,6 +497,8 @@ const IDENTIFIED_CANDIDATE = {
   education: true,
   certifications: true,
   cvUrl: true,
+  cvFilename: true,
+  cvSizeBytes: true,
   contactEmail: true,
   contactPhone: true,
   openToWork: true,
@@ -438,3 +525,21 @@ const ANONYMISED_CANDIDATE = {
 } satisfies Prisma.CandidateProfileSelect;
 
 export const CANDIDATE_PAGE_SIZE = 20;
+
+/**
+ * A CV is smaller than a scope-of-accreditation document and there is one per
+ * person, so it gets its own, tighter ceiling rather than the 15 MB the
+ * laboratory documents allow.
+ */
+export const MAX_CV_BYTES = 5 * 1024 * 1024;
+
+/**
+ * What a CV may be. PDF is the norm; the two Word formats are accepted because
+ * plenty of people have only ever had a .doc. Nothing else — this is a file
+ * that strangers will open.
+ */
+export const ALLOWED_CV_TYPES = new Set([
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+]);
