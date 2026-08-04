@@ -4,7 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { ServiceNotice } from "@/components/ServiceNotice";
-import { useLang, pick } from "@/lib/i18n";
+import {
+  exportStandardsCsv,
+  exportStandardsXlsx,
+  printStandards,
+} from "./standards-export";
+import { useLang, pick, type Lang } from "@/lib/i18n";
 import { formatNumber } from "@/lib/format";
 import {
   EMPTY_QUERY,
@@ -21,6 +26,15 @@ import {
   type StandardsPage,
   type StandardsQuery,
 } from "@/lib/standards";
+
+/**
+ * The catalogue is paged on the server, so an export has to gather the matching
+ * rows first. Bounded because "everything" can be 68 657 records — and when the
+ * bound bites the reader is told, rather than being handed a short file that
+ * looks complete.
+ */
+const EXPORT_CAP = 5000;
+const EXPORT_PAGE_SIZE = 100;
 
 const T = {
   heading: {
@@ -68,6 +82,16 @@ const T = {
   page: { ru: "Страница", uz: "Sahifa", en: "Page" },
   of: { ru: "из", uz: "dan", en: "of" },
   pages: { ru: "с.", uz: "b.", en: "pp." },
+  export: { ru: "Экспорт", uz: "Eksport", en: "Export" },
+  exportCsv: { ru: "Скачать CSV", uz: "CSV yuklab olish", en: "Download CSV" },
+  exportXlsx: { ru: "Скачать XLSX", uz: "XLSX yuklab olish", en: "Download XLSX" },
+  exportPrint: { ru: "Печать / PDF", uz: "Chop etish / PDF", en: "Print / PDF" },
+  preparing: { ru: "Готовим файл…", uz: "Fayl tayyorlanmoqda…", en: "Preparing the file…" },
+  capped: {
+    ru: `Выгружены первые ${EXPORT_CAP.toLocaleString("ru-RU")} записей из`,
+    uz: `Dastlabki ${EXPORT_CAP.toLocaleString("ru-RU")} ta yozuv yuklandi, jami`,
+    en: `Exported the first ${EXPORT_CAP.toLocaleString("en-GB")} records of`,
+  },
 } as const;
 
 const SELECT_CLASS =
@@ -136,6 +160,45 @@ export function StandardsApp() {
     setText("");
     setQuery(EMPTY_QUERY);
   }, []);
+
+  const [exporting, setExporting] = useState(false);
+  const [exportNote, setExportNote] = useState<string | null>(null);
+
+  /** Walks the matching pages up to the cap, then hands them to the writer. */
+  const collect = useCallback(async (): Promise<StandardListItem[] | null> => {
+    const gathered: StandardListItem[] = [];
+    for (let page = 1; gathered.length < EXPORT_CAP; page++) {
+      const params = toSearchParams({ ...query, page });
+      const separator = params ? "&" : "?";
+      const body = await api.get<StandardsPage>(
+        `${STANDARDS_PATH}${params}${separator}pageSize=${EXPORT_PAGE_SIZE}`,
+      );
+      gathered.push(...body.items);
+      if (body.items.length < EXPORT_PAGE_SIZE || gathered.length >= body.total) break;
+    }
+    return gathered;
+  }, [query]);
+
+  const runExport = useCallback(
+    async (write: (items: StandardListItem[], lang: Lang) => void) => {
+      setExporting(true);
+      setExportNote(null);
+      try {
+        const items = await collect();
+        if (!items?.length) return;
+        write(items, lang);
+        const total = result?.total ?? items.length;
+        if (items.length < total) {
+          setExportNote(`${pick(T.capped, lang)} ${formatNumber(total, lang)}`);
+        }
+      } catch {
+        setExportNote(pick(T.failed, lang));
+      } finally {
+        setExporting(false);
+      }
+    },
+    [collect, result, lang],
+  );
 
   // Nothing ever loaded and the service is unreachable: show the same notice
   // the registry does rather than an empty catalogue with a filter sidebar.
@@ -289,6 +352,30 @@ export function StandardsApp() {
         </aside>
 
         <div>
+          <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
+            <ExportButton
+              label={pick(T.exportCsv, lang)}
+              disabled={exporting || !result?.total}
+              onClick={() => void runExport(exportStandardsCsv)}
+            />
+            <ExportButton
+              label={pick(T.exportXlsx, lang)}
+              disabled={exporting || !result?.total}
+              onClick={() => void runExport(exportStandardsXlsx)}
+            />
+            <ExportButton
+              label={pick(T.exportPrint, lang)}
+              disabled={!result?.total}
+              onClick={() => printStandards()}
+            />
+          </div>
+
+          {(exporting || exportNote) && (
+            <p className="mb-3 text-xs" style={{ color: "var(--uz-text-muted)" }}>
+              {exporting ? pick(T.preparing, lang) : exportNote}
+            </p>
+          )}
+
           <p className="text-sm" style={{ color: "var(--uz-text-muted)" }}>
             {loading && !result ? (
               pick(T.loading, lang)
@@ -435,5 +522,31 @@ function StandardRow({ item, lang }: { item: StandardListItem; lang: "ru" | "uz"
         {item.language && <span>{item.language}</span>}
       </p>
     </li>
+  );
+}
+
+function ExportButton({
+  label,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className="reg-print-hide rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-40"
+      style={{
+        background: "var(--uz-bg-raised)",
+        border: "1px solid var(--uz-border)",
+        color: "var(--uz-text)",
+      }}
+    >
+      {label}
+    </button>
   );
 }
