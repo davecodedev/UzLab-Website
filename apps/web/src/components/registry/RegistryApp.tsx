@@ -87,6 +87,7 @@ const UI = {
   },
   filters: { ru: "Фильтры", uz: "Filtrlar", en: "Filters" },
   clearAll: { ru: "Очистить всё", uz: "Barchasini tozalash", en: "Clear all" },
+  removeView: { ru: "Удалить подборку", uz: "To'plamni o'chirish", en: "Remove saved view" },
   regNo: { ru: "Регистрационный номер", uz: "Ro'yxat raqami", en: "Registry number" },
   orgName: { ru: "Название организации", uz: "Tashkilot nomi", en: "Organization name" },
   register: { ru: "Реестр", uz: "Reyestr", en: "Register" },
@@ -1018,7 +1019,7 @@ function SavedViewsBar({
             <button
               type="button"
               onClick={() => onRemove(v.id)}
-              aria-label="remove"
+              aria-label={t("removeView", lang)}
               className="reg-btn flex items-center justify-center rounded-full p-0.5"
               style={{ color: "var(--reg-gray-3)" }}
             >

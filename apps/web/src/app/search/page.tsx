@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SearchFiltersForm } from "@/components/SearchFiltersForm";
+import { SearchPageHeading, SearchResultCount } from "@/components/SearchPageText";
 import { api } from "@/lib/api";
 
 interface SearchResultItem {
@@ -53,25 +54,13 @@ export default async function SearchPage({
 
   return (
     <div className="mx-auto max-w-[860px] px-8 py-14">
-      <h1
-        className="text-[34px] font-extrabold leading-[1.1]"
-        style={{ fontFamily: "var(--uz-font-display)", color: "var(--uz-navy-900)" }}
-      >
-        Поиск
-      </h1>
-      <p className="mt-2 text-sm" style={{ color: "var(--uz-text-muted)" }}>
-        Новости, члены ассоциации и лаборатории — в одном поиске.
-      </p>
+      <SearchPageHeading />
 
       <div className="mt-6">
         <SearchFiltersForm action="/search" values={params} showType />
       </div>
 
-      {hasQuery && (
-        <p className="mt-6 text-sm" style={{ color: "var(--uz-text-muted)" }}>
-          {results.length} результат{results.length === 1 ? "" : results.length < 5 ? "а" : "ов"}
-        </p>
-      )}
+      {hasQuery && <SearchResultCount count={results.length} />}
 
       {results.length > 0 && (
         <div

@@ -218,6 +218,117 @@ export const DIRECTION_VALUES: string[] = [
   "Электрическая продукция",
 ];
 
+/**
+ * How to *show* each of those values. The value itself is what the filter
+ * matches on and must stay verbatim, so the label is a separate lookup rather
+ * than a rewrite of the list above — including for the two misspellings, which
+ * are shown correctly even though they are stored as the register wrote them.
+ */
+export const DIRECTION_LABELS: Record<string, { ru: string; uz: string; en: string }> = {
+  "Qishloq xo'jaligi": {
+    ru: "Сельское хозяйство",
+    uz: "Qishloq xo'jaligi",
+    en: "Agriculture",
+  },
+  "Атестация рабочих мест": {
+    ru: "Аттестация рабочих мест",
+    uz: "Ish joylarini attestatsiyalash",
+    en: "Workplace attestation",
+  },
+  Ветеринария: { ru: "Ветеринария", uz: "Veterinariya", en: "Veterinary medicine" },
+  ГБО: {
+    ru: "ГБО (газобаллонное оборудование)",
+    uz: "GBO (gaz-ballon uskunalari)",
+    en: "LPG vehicle equipment",
+  },
+  Игрушки: { ru: "Игрушки", uz: "O'yinchoqlar", en: "Toys" },
+  Карантин: { ru: "Карантин", uz: "Karantin", en: "Quarantine" },
+  "Лаборатория неразрушаюшего контроля": {
+    ru: "Лаборатория неразрушающего контроля",
+    uz: "Buzmasdan nazorat qilish laboratoriyasi",
+    en: "Non-destructive testing laboratory",
+  },
+  "Лаборатория неразрушающего контроля": {
+    ru: "Лаборатория неразрушающего контроля",
+    uz: "Buzmasdan nazorat qilish laboratoriyasi",
+    en: "Non-destructive testing laboratory",
+  },
+  "Машиностроение и продукция тяжелой промышленности": {
+    ru: "Машиностроение и продукция тяжёлой промышленности",
+    uz: "Mashinasozlik va og'ir sanoat mahsulotlari",
+    en: "Mechanical engineering and heavy industry products",
+  },
+  Медицинская: { ru: "Медицинская", uz: "Tibbiyot", en: "Medical" },
+  "Металлическая лаборатория": {
+    ru: "Металлическая лаборатория",
+    uz: "Metall laboratoriyasi",
+    en: "Metals laboratory",
+  },
+  "Пищевая продукция": {
+    ru: "Пищевая продукция",
+    uz: "Oziq-ovqat mahsulotlari",
+    en: "Food products",
+  },
+  "Продукция легкой прошмышенности": {
+    ru: "Продукция лёгкой промышленности",
+    uz: "Yengil sanoat mahsulotlari",
+    en: "Light industry products",
+  },
+  "Продукция химической промышленности": {
+    ru: "Продукция химической промышленности",
+    uz: "Kimyo sanoati mahsulotlari",
+    en: "Chemical industry products",
+  },
+  Прочие: { ru: "Прочие", uz: "Boshqalar", en: "Other" },
+  "Спортивные снаряды, инвентарь и оборудование": {
+    ru: "Спортивные снаряды, инвентарь и оборудование",
+    uz: "Sport anjomlari, inventar va uskunalar",
+    en: "Sports apparatus, gear and equipment",
+  },
+  "Строительная продукция": {
+    ru: "Строительная продукция",
+    uz: "Qurilish mahsulotlari",
+    en: "Construction products",
+  },
+  "Табачная продукция": {
+    ru: "Табачная продукция",
+    uz: "Tamaki mahsulotlari",
+    en: "Tobacco products",
+  },
+  "текстильная продукция": {
+    ru: "Текстильная продукция",
+    uz: "To'qimachilik mahsulotlari",
+    en: "Textile products",
+  },
+  "Технический осмотр": {
+    ru: "Технический осмотр",
+    uz: "Texnik ko'rik",
+    en: "Technical inspection",
+  },
+  "Топливо и энергетическая продукция": {
+    ru: "Топливо и энергетическая продукция",
+    uz: "Yoqilg'i va energetika mahsulotlari",
+    en: "Fuel and energy products",
+  },
+  "Фармацевтическая продукция": {
+    ru: "Фармацевтическая продукция",
+    uz: "Farmatsevtika mahsulotlari",
+    en: "Pharmaceutical products",
+  },
+  Экология: { ru: "Экология", uz: "Ekologiya", en: "Ecology" },
+  "Электрическая продукция": {
+    ru: "Электрическая продукция",
+    uz: "Elektr mahsulotlari",
+    en: "Electrical products",
+  },
+};
+
+/** Falls back to the register's own wording for a value with no label yet. */
+export function directionLabel(value: string, lang: Lang): string {
+  const label = DIRECTION_LABELS[value];
+  return label ? label[lang] : value;
+}
+
 /** `@ArrayMaxSize(30)` on `directions`. */
 export const DIRECTIONS_MAX = 30;
 

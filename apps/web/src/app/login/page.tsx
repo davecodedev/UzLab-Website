@@ -16,6 +16,7 @@ interface AuthResponse {
 
 const T = {
   email: { ru: "E-mail", uz: "E-mail", en: "E-mail" },
+  emailPlaceholder: { ru: "familiya@lab.uz", uz: "familiya@lab.uz", en: "surname@lab.uz" },
   password: { ru: "Пароль", uz: "Parol", en: "Password" },
   remember: { ru: "Запомнить меня", uz: "Meni eslab qol", en: "Remember me" },
   forgot: { ru: "Забыли пароль?", uz: "Parolni unutdingizmi?", en: "Forgot password?" },
@@ -66,7 +67,7 @@ function LoginForm() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          placeholder="familiya@lab.uz"
+          placeholder={pick(T.emailPlaceholder, lang)}
         />
         <AuthInput
           label={pick(T.password, lang)}

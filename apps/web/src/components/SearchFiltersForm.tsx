@@ -44,6 +44,12 @@ const T = {
     uz: "Sayt bo'ylab qidirish…",
     en: "Search the site…",
   },
+  tagsPlaceholder: {
+    ru: "через запятую",
+    uz: "vergul bilan ajrating",
+    en: "comma, separated",
+  },
+  regionPlaceholder: { ru: "Ташкент…", uz: "Toshkent…", en: "Tashkent…" },
 } as const;
 
 export interface SearchFiltersValue {
@@ -79,7 +85,7 @@ export function SearchFiltersForm({
         <input
           name="q"
           defaultValue={values.q ?? ""}
-          placeholder="Keywords…"
+          placeholder={pick(T.queryPlaceholder, lang)}
           className={inputClass}
           style={inputStyle}
         />
@@ -142,14 +148,14 @@ export function SearchFiltersForm({
           <input
             name="tags"
             defaultValue={values.tags ?? ""}
-            placeholder="comma, separated"
+            placeholder={pick(T.tagsPlaceholder, lang)}
             className={`mt-1 ${inputClass}`}
             style={inputStyle}
           />
         </div>
         <div>
           <label className={labelClass} style={labelStyle}>
-            From date
+            {pick(T.dateFrom, lang)}
           </label>
           <input
             type="date"
@@ -161,7 +167,7 @@ export function SearchFiltersForm({
         </div>
         <div>
           <label className={labelClass} style={labelStyle}>
-            To date
+            {pick(T.dateTo, lang)}
           </label>
           <input
             type="date"
@@ -173,7 +179,7 @@ export function SearchFiltersForm({
         </div>
         <div>
           <label className={labelClass} style={labelStyle}>
-            Lab field
+            {pick(T.labField, lang)}
           </label>
           <select
             name="labField"
@@ -195,7 +201,7 @@ export function SearchFiltersForm({
           <input
             name="region"
             defaultValue={values.region ?? ""}
-            placeholder="Toshkent…"
+            placeholder={pick(T.regionPlaceholder, lang)}
             className={`mt-1 ${inputClass}`}
             style={inputStyle}
           />

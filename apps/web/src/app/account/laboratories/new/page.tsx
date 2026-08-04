@@ -20,6 +20,7 @@ import {
   MAX_DOCUMENT_BYTES,
   NAME_MIN_LENGTH,
   SUGGESTIBLE_FIELDS,
+  directionLabel,
   formatFileSize,
   type AnalyzedDocument,
   type LaboratoryDocumentKind,
@@ -1610,7 +1611,9 @@ export default function NewLaboratoryPage() {
                         className="mt-0.5 h-4 w-4 shrink-0"
                         style={{ accentColor: "var(--uz-blue-600)" }}
                       />
-                      <span style={{ color: "var(--uz-text)" }}>{value}</span>
+                      <span style={{ color: "var(--uz-text)" }}>
+                        {directionLabel(value, lang)}
+                      </span>
                     </label>
                   );
                 })}

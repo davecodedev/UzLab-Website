@@ -18,6 +18,7 @@ const T = {
   name: { ru: "Организация или имя", uz: "Tashkilot yoki ism", en: "Organization or name" },
   namePh: { ru: "ИЦ «Стандарт-Сервис»", uz: "«Standart-Servis» SM", en: "Standard-Service TC" },
   email: { ru: "E-mail", uz: "E-mail", en: "E-mail" },
+  emailPlaceholder: { ru: "familiya@lab.uz", uz: "familiya@lab.uz", en: "surname@lab.uz" },
   password: { ru: "Пароль", uz: "Parol", en: "Password" },
   submit: { ru: "Создать аккаунт", uz: "Akkaunt yaratish", en: "Create account" },
   haveAcc: { ru: "Уже есть аккаунт?", uz: "Akkaunt bormi?", en: "Have an account?" },
@@ -69,7 +70,7 @@ function RegisterForm() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          placeholder="familiya@lab.uz"
+          placeholder={pick(T.emailPlaceholder, lang)}
         />
         <AuthInput
           label={pick(T.password, lang)}
