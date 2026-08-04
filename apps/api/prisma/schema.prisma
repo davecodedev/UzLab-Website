@@ -40,6 +40,7 @@ model User {
   submittedLaboratories  Laboratory[]            @relation("SubmittedLaboratories")
   postedVacancies        Vacancy[]               @relation("PostedVacancies")
   jobApplications        JobApplication[]        @relation("SubmittedApplications")
+  candidateProfile       CandidateProfile?
 
   @@index([deletedAt])
 }
@@ -768,4 +769,61 @@ model JobApplication {
   @@unique([vacancyId, userId])
   @@index([vacancyId, status])
   @@index([userId])
+}
+
+enum CandidateVisibility {
+  /// Written but not discoverable — the default, so nothing is published by
+  /// accident while a profile is still being filled in.
+  HIDDEN
+  /// Discoverable by employers.
+  PUBLISHED
+}
+
+/// A job seeker advertising themselves, so employers can find them rather than
+/// waiting to be applied to.
+///
+/// This is personal data about a named individual, which the vacancy side is
+/// not, and it is treated differently for that reason: the profile is written
+/// by the person it describes, it is hidden until they publish it, and the
+/// identifying parts are withheld from anyone not signed in. A CV database
+/// readable by the open web is a CV database that gets scraped.
+model CandidateProfile {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  fullName String
+  /// "Инженер-химик, испытания воды" — the one line an employer scans.
+  headline String
+
+  region String?
+  city   String?
+
+  /// Which laboratory field they work in, reusing the registry's own vocabulary
+  /// so a search here and a search there mean the same thing.
+  fields LaboratoryField[] @default([])
+
+  yearsExperience Int?
+  /// Their own account of what they do. Free text, their words.
+  summary         String
+  skills          String[] @default([])
+  education       String?
+  certifications  String?
+
+  cvUrl String?
+
+  /// Withheld from anyone not signed in.
+  contactEmail String
+  contactPhone String?
+
+  visibility CandidateVisibility @default(HIDDEN)
+  /// Distinct from visibility: a published profile whose owner is not currently
+  /// looking still says so, rather than disappearing and reappearing.
+  openToWork Boolean             @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([visibility, openToWork])
+  @@index([region])
 }

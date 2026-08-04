@@ -1,11 +1,24 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { CareersService } from './careers.service.js';
 import {
   ApplyDto,
   CreateVacancyDto,
+  ListCandidatesDto,
   ListVacanciesDto,
   ReviewApplicationDto,
   UpdateVacancyDto,
+  UpsertCandidateDto,
 } from './dto/careers.dto.js';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard.js';
 import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard.js';
@@ -64,6 +77,48 @@ export class CareersController {
     @CurrentUser() user?: { id: string },
   ) {
     return this.careers.apply(slug, dto, user?.id ?? null);
+  }
+
+  // --- Candidates ----------------------------------------------------------
+
+  /**
+   * The candidate directory.
+   *
+   * Whether names and contact details come back is decided here, from the
+   * token, and passed to the service as a boolean. It is deliberately not a
+   * query parameter: those are set by the caller, and "identified=true" would
+   * be the whole of the access control.
+   */
+  @Throttle({ default: THROTTLE_SEARCH })
+  @UseGuards(OptionalJwtAuthGuard)
+  @Get('candidates')
+  candidates(@Query() query: ListCandidatesDto, @CurrentUser() user?: { id: string }) {
+    return this.careers.listCandidates(query, !!user);
+  }
+
+  @Get('candidates/facets')
+  candidateFacets() {
+    return this.careers.candidateFacets();
+  }
+
+  /** Declared before `candidates/:id` would be, so "me" is not read as an id. */
+  @UseGuards(JwtAuthGuard)
+  @Get('candidates/me')
+  myCandidateProfile(@CurrentUser() user: { id: string }) {
+    return this.careers.getMyCandidateProfile(user.id);
+  }
+
+  @Throttle({ default: THROTTLE_BULK })
+  @UseGuards(JwtAuthGuard)
+  @Put('candidates/me')
+  saveCandidateProfile(@CurrentUser() user: { id: string }, @Body() dto: UpsertCandidateDto) {
+    return this.careers.upsertCandidateProfile(user.id, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('candidates/me')
+  deleteCandidateProfile(@CurrentUser() user: { id: string }) {
+    return this.careers.deleteCandidateProfile(user.id);
   }
 
   // --- Employers -----------------------------------------------------------

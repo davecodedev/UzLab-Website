@@ -1,13 +1,15 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, VacancyStatus } from '@prisma/client';
+import { CandidateVisibility, Prisma, VacancyStatus } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
 import { slugify } from '../../common/utils/slugify.js';
 import {
   ApplyDto,
   CreateVacancyDto,
+  ListCandidatesDto,
   ListVacanciesDto,
   ReviewApplicationDto,
   UpdateVacancyDto,
+  UpsertCandidateDto,
 } from './dto/careers.dto.js';
 
 const PAGE_SIZE = 20;
@@ -278,6 +280,102 @@ export class CareersService {
     }
   }
 
+  // --- Candidates ----------------------------------------------------------
+
+  /** A candidate's own profile, whatever its visibility — it is theirs. */
+  getMyCandidateProfile(userId: string) {
+    return this.prisma.candidateProfile.findUnique({
+      where: { userId },
+      select: { ...IDENTIFIED_CANDIDATE, visibility: true },
+    });
+  }
+
+  /** One profile per person; saving again edits the one they have. */
+  upsertCandidateProfile(userId: string, dto: UpsertCandidateDto) {
+    const data = {
+      fullName: dto.fullName,
+      headline: dto.headline,
+      region: dto.region,
+      city: dto.city,
+      fields: dto.fields ?? [],
+      yearsExperience: dto.yearsExperience,
+      summary: dto.summary,
+      skills: dto.skills ?? [],
+      education: dto.education,
+      certifications: dto.certifications,
+      cvUrl: dto.cvUrl,
+      contactEmail: dto.contactEmail,
+      contactPhone: dto.contactPhone,
+      visibility: dto.visibility,
+      openToWork: dto.openToWork,
+    };
+    return this.prisma.candidateProfile.upsert({
+      where: { userId },
+      create: { ...data, userId, visibility: dto.visibility ?? CandidateVisibility.HIDDEN },
+      update: data,
+      select: { ...IDENTIFIED_CANDIDATE, visibility: true },
+    });
+  }
+
+  async deleteCandidateProfile(userId: string) {
+    await this.prisma.candidateProfile.deleteMany({ where: { userId } });
+    return { deleted: true };
+  }
+
+  /**
+   * The candidate directory. `identified` decides which projection is used, and
+   * it is decided by the controller from the token — never by a query
+   * parameter, which the caller controls.
+   */
+  async listCandidates(query: ListCandidatesDto, identified: boolean) {
+    const page = Math.max(1, query.page ?? 1);
+    const where: Prisma.CandidateProfileWhereInput = {
+      visibility: CandidateVisibility.PUBLISHED,
+    };
+
+    if (query.region) where.region = query.region;
+    if (query.field) where.fields = { has: query.field };
+    if (query.q?.trim()) {
+      const q = query.q.trim();
+      where.OR = [
+        { headline: { contains: q, mode: 'insensitive' } },
+        { summary: { contains: q, mode: 'insensitive' } },
+        { skills: { has: q } },
+      ];
+    }
+
+    const [items, total] = await Promise.all([
+      this.prisma.candidateProfile.findMany({
+        where,
+        select: identified ? IDENTIFIED_CANDIDATE : ANONYMISED_CANDIDATE,
+        // Available first, then most recently updated: a stale profile is the
+        // least useful thing to put at the top of a directory.
+        orderBy: [{ openToWork: 'desc' }, { updatedAt: 'desc' }],
+        skip: (page - 1) * CANDIDATE_PAGE_SIZE,
+        take: CANDIDATE_PAGE_SIZE,
+      }),
+      this.prisma.candidateProfile.count({ where }),
+    ]);
+
+    return { items, total, page, pageSize: CANDIDATE_PAGE_SIZE, identified };
+  }
+
+  /** Regions and fields that actually have published candidates. */
+  async candidateFacets() {
+    const where = { visibility: CandidateVisibility.PUBLISHED };
+    const rows = await this.prisma.candidateProfile.groupBy({
+      by: ['region'],
+      where,
+      _count: { _all: true },
+    });
+    return {
+      regions: rows
+        .filter((r) => r.region)
+        .map((r) => ({ value: r.region as string, count: r._count._all }))
+        .sort((a, b) => b.count - a.count),
+    };
+  }
+
   /**
    * `slugify` keeps only ASCII, so a title written in Cyrillic or in Uzbek with
    * apostrophes can reduce to nothing. The organisation name is tried next, and
@@ -296,3 +394,47 @@ export class CareersService {
     }
   }
 }
+
+/**
+ * What a signed-in employer sees of a candidate: everything the candidate
+ * wrote, including how to reach them.
+ */
+const IDENTIFIED_CANDIDATE = {
+  id: true,
+  fullName: true,
+  headline: true,
+  region: true,
+  city: true,
+  fields: true,
+  yearsExperience: true,
+  summary: true,
+  skills: true,
+  education: true,
+  certifications: true,
+  cvUrl: true,
+  contactEmail: true,
+  contactPhone: true,
+  openToWork: true,
+  updatedAt: true,
+} satisfies Prisma.CandidateProfileSelect;
+
+/**
+ * What everyone else sees. The name, the CV link and both contact fields are
+ * absent from the query, not blanked afterwards — a profile is personal data
+ * about a named person, and an anonymous caller has no business receiving it.
+ * Enough remains that a visitor can see the directory is worth signing in for.
+ */
+const ANONYMISED_CANDIDATE = {
+  id: true,
+  headline: true,
+  region: true,
+  city: true,
+  fields: true,
+  yearsExperience: true,
+  summary: true,
+  skills: true,
+  openToWork: true,
+  updatedAt: true,
+} satisfies Prisma.CandidateProfileSelect;
+
+export const CANDIDATE_PAGE_SIZE = 20;

@@ -135,3 +135,105 @@ export function toSearchParams(query: VacancyQuery): string {
   const s = params.toString();
   return s ? `?${s}` : "";
 }
+
+// --- Candidates ------------------------------------------------------------
+
+export type CandidateVisibility = "HIDDEN" | "PUBLISHED";
+
+/** The registry's own field vocabulary, so both sides mean the same thing. */
+export type LaboratoryField =
+  | "TESTING"
+  | "METROLOGY"
+  | "MEDICINE"
+  | "ECOLOGY"
+  | "INDUSTRY"
+  | "AGRICULTURE"
+  | "FOOD"
+  | "CONSTRUCTION"
+  | "OTHER";
+
+export const FIELD_LABELS: Record<LaboratoryField, L10n> = {
+  TESTING: { ru: "Испытания", uz: "Sinov", en: "Testing" },
+  METROLOGY: { ru: "Метрология", uz: "Metrologiya", en: "Metrology" },
+  MEDICINE: { ru: "Медицина", uz: "Tibbiyot", en: "Medicine" },
+  ECOLOGY: { ru: "Экология", uz: "Ekologiya", en: "Ecology" },
+  INDUSTRY: { ru: "Промышленность", uz: "Sanoat", en: "Industry" },
+  AGRICULTURE: {
+    ru: "Сельское хозяйство",
+    uz: "Qishloq xo'jaligi",
+    en: "Agriculture",
+  },
+  FOOD: { ru: "Пищевая продукция", uz: "Oziq-ovqat", en: "Food" },
+  CONSTRUCTION: { ru: "Строительство", uz: "Qurilish", en: "Construction" },
+  OTHER: { ru: "Прочее", uz: "Boshqa", en: "Other" },
+};
+
+export const FIELD_ORDER: LaboratoryField[] = [
+  "TESTING",
+  "METROLOGY",
+  "MEDICINE",
+  "ECOLOGY",
+  "INDUSTRY",
+  "AGRICULTURE",
+  "FOOD",
+  "CONSTRUCTION",
+  "OTHER",
+];
+
+/**
+ * A candidate as the directory returns them.
+ *
+ * `fullName` and the contact fields are absent for a caller who is not signed
+ * in — the API omits them from the query rather than blanking them — so they
+ * are optional here, and the page must not assume they arrived.
+ */
+export interface Candidate {
+  id: string;
+  headline: string;
+  region: string | null;
+  city: string | null;
+  fields: LaboratoryField[];
+  yearsExperience: number | null;
+  summary: string;
+  skills: string[];
+  openToWork: boolean;
+  updatedAt: string;
+  fullName?: string;
+  education?: string | null;
+  certifications?: string | null;
+  cvUrl?: string | null;
+  contactEmail?: string;
+  contactPhone?: string | null;
+}
+
+export interface MyCandidateProfile extends Candidate {
+  fullName: string;
+  contactEmail: string;
+  visibility: CandidateVisibility;
+}
+
+export interface CandidatePage {
+  items: Candidate[];
+  total: number;
+  page: number;
+  pageSize: number;
+  /** True when the caller was signed in, so names and contacts are present. */
+  identified: boolean;
+}
+
+export interface CandidateQuery {
+  q?: string;
+  region?: string;
+  field?: LaboratoryField | "";
+  page?: number;
+}
+
+export function candidateSearchParams(query: CandidateQuery): string {
+  const params = new URLSearchParams();
+  if (query.q?.trim()) params.set("q", query.q.trim());
+  if (query.region) params.set("region", query.region);
+  if (query.field) params.set("field", query.field);
+  if (query.page && query.page > 1) params.set("page", String(query.page));
+  const s = params.toString();
+  return s ? `?${s}` : "";
+}

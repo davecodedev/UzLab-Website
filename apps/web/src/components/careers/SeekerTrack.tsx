@@ -5,6 +5,7 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import { useLang, pick } from "@/lib/i18n";
 import { formatNumber, formatRelative } from "@/lib/format";
+import { CandidateProfileForm } from "./CandidateProfileForm";
 import {
   CAREERS_PATH,
   EMPLOYMENT_LABELS,
@@ -203,6 +204,9 @@ export function SeekerTrack() {
           />
         </nav>
       )}
+
+      {/* The other half of a job board: being found, not only searching. */}
+      <CandidateProfileForm />
     </div>
   );
 }

@@ -1,4 +1,6 @@
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsEmail,
   IsEnum,
@@ -12,7 +14,13 @@ import {
   MinLength,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ApplicationStatus, EmploymentType, VacancyStatus } from '@prisma/client';
+import {
+  ApplicationStatus,
+  CandidateVisibility,
+  EmploymentType,
+  LaboratoryField,
+  VacancyStatus,
+} from '@prisma/client';
 
 export class CreateVacancyDto {
   @IsString()
@@ -165,6 +173,106 @@ export class ListVacanciesDto {
   @IsOptional()
   @IsEnum(EmploymentType)
   employmentType?: EmploymentType;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+}
+
+export class UpsertCandidateDto {
+  @IsString()
+  @MinLength(2)
+  @MaxLength(200)
+  fullName!: string;
+
+  /** The one line an employer scans in a list. */
+  @IsString()
+  @MinLength(4)
+  @MaxLength(200)
+  headline!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  region?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  city?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsEnum(LaboratoryField, { each: true })
+  @ArrayMaxSize(9)
+  fields?: LaboratoryField[];
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(60)
+  yearsExperience?: number;
+
+  @IsString()
+  @MinLength(40, { message: 'Please describe your experience in a couple of sentences.' })
+  @MaxLength(5000)
+  summary!: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @ArrayMaxSize(30)
+  skills?: string[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  education?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  certifications?: string;
+
+  @IsOptional()
+  @IsUrl()
+  @MaxLength(500)
+  cvUrl?: string;
+
+  @IsEmail()
+  contactEmail!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  contactPhone?: string;
+
+  @IsOptional()
+  @IsEnum(CandidateVisibility)
+  visibility?: CandidateVisibility;
+
+  @IsOptional()
+  @IsBoolean()
+  openToWork?: boolean;
+}
+
+export class ListCandidatesDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  q?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  region?: string;
+
+  @IsOptional()
+  @IsEnum(LaboratoryField)
+  field?: LaboratoryField;
 
   @IsOptional()
   @Type(() => Number)

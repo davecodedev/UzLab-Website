@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { CandidateDirectory } from "./CandidateDirectory";
 import { api, ApiError } from "@/lib/api";
 import { getAccessToken } from "@/lib/auth-client";
 import { useLang, pick } from "@/lib/i18n";
@@ -170,6 +171,10 @@ export function EmployerTrack() {
             </Link>
           </div>
         </div>
+
+        {/* Browsable without an account. The anonymised view exists so an
+            employer can see the directory is worth signing in for. */}
+        <CandidateDirectory />
       </div>
     );
   }
@@ -183,6 +188,11 @@ export function EmployerTrack() {
       <div>
         <Kicker label={pick(T.yoursHeading, lang)} />
         <MyVacancies vacancies={vacancies} onChanged={reload} />
+      </div>
+
+      {/* Full width under both columns: searching is its own task. */}
+      <div className="lg:col-span-2">
+        <CandidateDirectory />
       </div>
     </div>
   );
