@@ -40,16 +40,13 @@ export function Footer() {
   return (
     <footer className="mt-auto" style={{ background: "var(--uz-navy-950)" }}>
       <div className="mx-auto flex max-w-[1240px] flex-wrap items-center justify-between gap-6 px-8 py-10">
-        <div className="flex items-end leading-none" style={{ fontFamily: "var(--uz-font-display)" }}>
-          <span className="text-xl font-extrabold text-white">Uz</span>
-          <span
-            className="uz-slash mx-[1px] mb-1 inline-block h-4 w-1"
-            style={{ background: "var(--uz-blue-400)" }}
-          />
-          <span className="text-xl font-extrabold" style={{ color: "var(--uz-blue-400)" }}>
-            ab
-          </span>
-        </div>
+        {/* The real mark, not a text imitation of it. The footer is dark, so
+            the logo sits on a white plate rather than being inverted — there is
+            no light version of the asset. */}
+        <Link href="/" className="flex flex-none items-center rounded-md bg-white px-3 py-2">
+          {/* eslint-disable-next-line @next/next/no-img-element -- fixed-height logo, next/image adds no value here */}
+          <img src="/logo-uzlab.png" alt="UzLab" className="h-9 w-auto" />
+        </Link>
         <div className="flex flex-wrap gap-6">
           {links.map((l) => (
             <Link key={l.href} href={l.href} className="text-[13.5px] font-medium" style={{ color: "#8494AC" }}>

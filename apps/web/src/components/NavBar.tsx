@@ -90,7 +90,7 @@ function Logo() {
   return (
     <Link href="/" className="flex flex-none items-center">
       {/* eslint-disable-next-line @next/next/no-img-element -- fixed-height logo, next/image adds no value here */}
-      <img src="/logo-uzlab.png" alt="UzLab" className="h-[38px] w-auto" />
+      <img src="/logo-uzlab.png" alt="UzLab" className="h-[44px] w-auto sm:h-[60px]" />
     </Link>
   );
 }
@@ -118,20 +118,30 @@ export function NavBar() {
 
   return (
     <header className="sticky top-0 z-40 bg-white" style={{ borderBottom: "1px solid var(--uz-border)" }}>
-      <div className="mx-auto flex max-w-[1240px] flex-wrap items-center gap-x-5 gap-y-3 px-8 py-2.5" style={{ minHeight: 64 }}>
+      <div className="mx-auto flex max-w-[1240px] flex-nowrap items-center gap-x-4 px-5 py-2 sm:px-8" style={{ minHeight: 76 }}>
         <Logo />
 
-        <nav className="hidden min-w-0 flex-1 flex-wrap gap-0.5 lg:flex">
+        <nav className="hidden min-w-0 flex-1 flex-nowrap items-center justify-center gap-0.5 lg:flex">
           {links.map((link) => (
             <NavLink key={link.href} {...link} />
           ))}
         </nav>
 
-        <LangPill />
+        {/* Everything from here is the right-hand group. `ml-auto` pins it to
+            the edge, which is what puts the menu button hard right on a phone
+            where the nav in the middle is not rendered at all. */}
+        <div className="ml-auto flex flex-none items-center gap-3">
+          <LangPill />
 
         {user ? (
           <div className="hidden items-center gap-3 lg:flex">
-            <span className="text-sm" style={{ color: "var(--uz-text-muted)" }}>
+            {/* Truncated, and only from xl: a long organisation name is what
+                pushed this row onto two lines. */}
+            <span
+              className="hidden max-w-[16ch] truncate text-sm xl:block"
+              style={{ color: "var(--uz-text-muted)" }}
+              title={user.fullName}
+            >
               {user.fullName}
             </span>
             {/* Signed in, this leads where the person actually works: staff to
@@ -166,22 +176,24 @@ export function NavBar() {
           </Link>
         )}
 
-        <button
-          onClick={() => setMobileOpen((o) => !o)}
-          aria-label={pick(NAV_DICT.toggleMenu, lang)}
-          className="rounded-md p-1.5 lg:hidden"
-          style={{ color: "var(--uz-text)" }}
-        >
+          <button
+            onClick={() => setMobileOpen((o) => !o)}
+            aria-label={pick(NAV_DICT.toggleMenu, lang)}
+            // 44px square: the minimum a finger reliably hits.
+            className="-mr-2 flex h-11 w-11 items-center justify-center rounded-md lg:hidden"
+            style={{ color: "var(--uz-text)" }}
+          >
           {mobileOpen ? (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M18 6 6 18M6 6l12 12" />
             </svg>
           ) : (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           )}
-        </button>
+          </button>
+        </div>
       </div>
 
       {mobileOpen && (
