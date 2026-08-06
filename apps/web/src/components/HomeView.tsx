@@ -148,7 +148,10 @@ export function HomeView({ news }: { news: NewsArticle[] }) {
             <Link
               key={c.href}
               href={c.href}
-              className="rounded-xl bg-white p-6 transition-shadow"
+              // Column layout so the call to action sits on the baseline in
+              // every card: the middle one runs to three lines and used to push
+              // its link below the other two.
+              className="flex flex-col rounded-xl bg-white p-6 transition-shadow"
               style={{ border: "1px solid var(--uz-border)", boxShadow: "var(--uz-shadow-sm)" }}
             >
               <svg width="28" height="28" viewBox="0 0 28 28" fill="none" className="mb-3.5">
@@ -162,7 +165,7 @@ export function HomeView({ news }: { news: NewsArticle[] }) {
               <p className="mb-3.5 text-[13.5px] leading-relaxed" style={{ color: "var(--uz-text-muted)" }}>
                 {c.sub}
               </p>
-              <span className="text-sm font-semibold" style={{ color: "var(--uz-blue-600)" }}>
+              <span className="mt-auto text-sm font-semibold" style={{ color: "var(--uz-blue-600)" }}>
                 {c.action} →
               </span>
             </Link>
