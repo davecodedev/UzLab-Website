@@ -42,7 +42,7 @@ function NavLink({ href, label }: { href: string; label: string }) {
   return (
     <Link
       href={href}
-      className="relative whitespace-nowrap rounded-md px-3 py-2 text-[14.5px] transition-colors"
+      className="relative whitespace-nowrap rounded-md px-2.5 py-2 text-[14px] transition-colors xl:px-3 xl:text-[14.5px]"
       style={{
         fontWeight: active ? 600 : 500,
         color: active ? "var(--uz-blue-700)" : "var(--uz-text)",
@@ -51,7 +51,7 @@ function NavLink({ href, label }: { href: string; label: string }) {
       {label}
       {active && (
         <span
-          className="uz-slash absolute bottom-[-1px] left-3 h-[3px] w-[26px]"
+          className="uz-slash absolute bottom-[-1px] left-2.5 h-[3px] w-[24px] xl:left-3"
           style={{ background: "var(--uz-blue-600)" }}
         />
       )}
@@ -121,7 +121,7 @@ export function NavBar() {
       <div className="mx-auto flex max-w-[1240px] flex-nowrap items-center gap-x-4 px-5 py-2 sm:px-8" style={{ minHeight: 76 }}>
         <Logo />
 
-        <nav className="hidden min-w-0 flex-1 flex-nowrap items-center justify-center gap-0.5 lg:flex">
+        <nav className="hidden min-w-0 flex-1 flex-nowrap items-center justify-center gap-0.5 xl:flex">
           {links.map((link) => (
             <NavLink key={link.href} {...link} />
           ))}
@@ -134,11 +134,11 @@ export function NavBar() {
           <LangPill />
 
         {user ? (
-          <div className="hidden items-center gap-3 lg:flex">
+          <div className="hidden items-center gap-3 xl:flex">
             {/* Truncated, and only from xl: a long organisation name is what
                 pushed this row onto two lines. */}
             <span
-              className="hidden max-w-[16ch] truncate text-sm xl:block"
+              className="hidden max-w-[18ch] truncate text-sm 2xl:block"
               style={{ color: "var(--uz-text-muted)" }}
               title={user.fullName}
             >
@@ -169,7 +169,7 @@ export function NavBar() {
         ) : (
           <Link
             href="/login"
-            className="hidden flex-none items-center rounded-md px-[18px] text-sm font-semibold text-white lg:flex"
+            className="hidden flex-none items-center rounded-md px-[18px] text-sm font-semibold text-white xl:flex"
             style={{ height: 38, background: "var(--uz-navy-900)" }}
           >
             {pick(NAV_DICT.account, lang)}
@@ -180,7 +180,7 @@ export function NavBar() {
             onClick={() => setMobileOpen((o) => !o)}
             aria-label={pick(NAV_DICT.toggleMenu, lang)}
             // 44px square: the minimum a finger reliably hits.
-            className="-mr-2 flex h-11 w-11 items-center justify-center rounded-md lg:hidden"
+            className="-mr-2 flex h-11 w-11 items-center justify-center rounded-md xl:hidden"
             style={{ color: "var(--uz-text)" }}
           >
           {mobileOpen ? (
@@ -197,7 +197,7 @@ export function NavBar() {
       </div>
 
       {mobileOpen && (
-        <div className="px-8 py-4 lg:hidden" style={{ borderTop: "1px solid var(--uz-border)" }}>
+        <div className="px-5 py-4 sm:px-8 xl:hidden" style={{ borderTop: "1px solid var(--uz-border)" }}>
           <nav className="flex flex-col gap-3">
             {links.map((link) => (
               <NavLink key={link.href} {...link} />
