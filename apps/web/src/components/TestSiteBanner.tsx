@@ -31,13 +31,16 @@ export function TestSiteBanner() {
   const after = at >= 0 ? notice.slice(at + emphasis.length) : "";
 
   return (
-    <div className="flex items-center justify-center gap-2 border-b border-warning-border bg-warning-bg px-4 py-2 text-center text-sm text-warning-foreground">
-      <span aria-hidden="true">⚠️</span>
-      <span>
+    // The icon sits inside the sentence rather than beside it: as a separate
+    // flex item it ends up floating at the vertical middle of a three-line
+    // wrap on a phone, detached from the words it belongs to.
+    <div className="border-b border-warning-border bg-warning-bg px-4 py-2 text-center text-sm text-warning-foreground">
+      <p className="mx-auto max-w-[70ch]">
+        <span aria-hidden="true">⚠️ </span>
         {before}
         {at >= 0 && <strong>{emphasis}</strong>}
         {after}
-      </span>
+      </p>
     </div>
   );
 }
