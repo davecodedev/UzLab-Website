@@ -42,7 +42,7 @@ function NavLink({ href, label }: { href: string; label: string }) {
   return (
     <Link
       href={href}
-      className="relative whitespace-nowrap rounded-md px-2.5 py-2 text-[14px] transition-colors xl:px-3 xl:text-[14.5px]"
+      className="relative whitespace-nowrap rounded-md px-2 py-2 text-[14px] transition-colors 2xl:px-3 2xl:text-[14.5px]"
       style={{
         fontWeight: active ? 600 : 500,
         color: active ? "var(--uz-blue-700)" : "var(--uz-text)",
@@ -51,7 +51,7 @@ function NavLink({ href, label }: { href: string; label: string }) {
       {label}
       {active && (
         <span
-          className="uz-slash absolute bottom-[-1px] left-2.5 h-[3px] w-[24px] xl:left-3"
+          className="uz-slash absolute bottom-[-1px] left-2 h-[3px] w-[22px] 2xl:left-3 2xl:w-[26px]"
           style={{ background: "var(--uz-blue-600)" }}
         />
       )}
@@ -118,10 +118,15 @@ export function NavBar() {
 
   return (
     <header className="sticky top-0 z-40 bg-white" style={{ borderBottom: "1px solid var(--uz-border)" }}>
-      <div className="mx-auto flex max-w-[1240px] flex-nowrap items-center gap-x-4 px-5 py-2 sm:px-8" style={{ minHeight: 76 }}>
+      <div className="mx-auto flex max-w-[1240px] flex-nowrap items-center gap-x-3 px-5 py-2 sm:px-8" style={{ minHeight: 76 }}>
         <Logo />
 
-        <nav className="hidden min-w-0 flex-1 flex-nowrap items-center justify-center gap-0.5 xl:flex">
+        <nav
+          // Scrollable as a safety net: a longer translation or a tenth link
+          // would otherwise be cut off in silence, as it was at lg.
+          className="hidden min-w-0 flex-1 flex-nowrap items-center justify-center gap-0.5 overflow-x-auto xl:flex"
+          style={{ scrollbarWidth: "none" }}
+        >
           {links.map((link) => (
             <NavLink key={link.href} {...link} />
           ))}
