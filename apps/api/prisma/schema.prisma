@@ -606,6 +606,10 @@ model IcsClass {
 enum PaymentGateway {
   PAYME // JSON-RPC merchant API, amounts in tiyin
   CLICK // Prepare/Complete callbacks, MD5-signed
+  /// Bank transfer against an invoice, confirmed by staff against the
+  /// statement. No gateway is involved, which is why this one may be raised in
+  /// a currency the gateways cannot settle.
+  BANK_TRANSFER
 }
 
 enum PaymentStatus {
@@ -640,6 +644,25 @@ model Payment {
   /// How many days of membership this buys, copied from the type at purchase
   /// time for the same reason.
   durationDays Int
+
+  // --- Bank transfer ------------------------------------------------------
+
+  /// Human-readable reference the payer quotes on the transfer, and the thing
+  /// staff match against the bank statement. Sequential per year.
+  invoiceNumber String? @unique
+
+  /// Who the invoice is made out to. Asked for because a laboratory's
+  /// accounts department needs its own legal name and tax id on the document,
+  /// which are not the same as the account holder's name.
+  payerName  String?
+  payerTaxId String?
+
+  /// Set when staff confirm the money arrived. Recorded rather than inferred:
+  /// granting a membership off a bank statement is a human decision, and it
+  /// should be attributable.
+  confirmedByUserId String?
+  confirmedAt       DateTime?
+  staffNote         String?
 
   /// The gateway's own transaction id. Unique so a repeated callback — they do
   /// retry — cannot be processed twice.

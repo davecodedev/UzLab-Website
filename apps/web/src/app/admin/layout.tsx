@@ -24,6 +24,7 @@ const NAV_GROUPS: { heading: string; links: { href: string; label: string; hint?
       { href: "/admin/claims", label: "Laboratory claims" },
       { href: "/admin/laboratory-submissions", label: "Lab submissions" },
       { href: "/admin/contact", label: "Contact & feedback" },
+      { href: "/admin/payments", label: "Bank transfers", hint: "Confirm invoices paid by transfer" },
     ],
   },
   {

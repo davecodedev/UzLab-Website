@@ -4,6 +4,7 @@ import {
   Get,
   Headers,
   HttpCode,
+  Param,
   Post,
   Query,
   UseGuards,
@@ -13,7 +14,7 @@ import { PaymentsService } from './payments.service.js';
 import { PaymeService } from './payme.service.js';
 import { PaymeError, PaymeErrorCode } from './payme.errors.js';
 import { ClickService, type ClickCallback } from './click.service.js';
-import { CreateInvoiceDto } from './dto/create-invoice.dto.js';
+import { ConfirmPaymentDto, CreateInvoiceDto } from './dto/create-invoice.dto.js';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../../common/guards/roles.guard.js';
@@ -38,7 +39,14 @@ export class PaymentsController {
       user.id,
       dto.membershipTypeId,
       dto.gateway,
+      { payerName: dto.payerName, payerTaxId: dto.payerTaxId },
     );
+  }
+
+  /** The association's account details, for the bank-transfer instructions. */
+  @Get('bank-details')
+  bankDetails() {
+    return this.payments.bankDetails();
   }
 
   @UseGuards(JwtAuthGuard)
@@ -52,6 +60,32 @@ export class PaymentsController {
   @Get()
   listAll(@Query('limit') limit?: string) {
     return this.payments.listAll(limit ? Number(limit) : undefined);
+  }
+
+  /**
+   * Staff confirming a bank transfer landed. This grants membership, so it is
+   * staff-only and the person who confirmed it is recorded on the row.
+   */
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.STAFF)
+  @Post(':id/confirm')
+  confirm(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+    @Body() dto: ConfirmPaymentDto,
+  ) {
+    return this.payments.confirmBankTransfer(id, user.id, dto.note);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.STAFF)
+  @Post(':id/cancel')
+  cancel(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+    @Body() dto: ConfirmPaymentDto,
+  ) {
+    return this.payments.cancelBankTransfer(id, user.id, dto.note);
   }
 
   /**

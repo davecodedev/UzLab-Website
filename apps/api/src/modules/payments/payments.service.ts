@@ -6,6 +6,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { PaymentGateway, PaymentStatus } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
+import { MembershipsService } from './memberships.service.js';
 
 /**
  * Raising an invoice and pointing the payer at a gateway.
@@ -19,23 +20,28 @@ export class PaymentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly memberships: MembershipsService,
   ) {}
 
   async createInvoice(
     userId: string,
     membershipTypeId: string,
     gateway: PaymentGateway,
+    payer: { payerName?: string; payerTaxId?: string } = {},
   ) {
     const type = await this.prisma.membershipType.findFirst({
       where: { id: membershipTypeId, isActive: true },
     });
     if (!type) throw new NotFoundException('Membership type not found');
 
-    if (type.currency !== 'UZS') {
-      // Payme and Click settle in so'm only. Better to refuse than to invent
-      // an exchange rate and charge something nobody agreed to.
+    // The gateways settle in so'm only, and inventing an exchange rate to
+    // charge someone is worse than refusing. A bank transfer has no such
+    // constraint: the invoice states the amount and a person reconciles it, so
+    // it may be raised in whatever currency the membership is priced in.
+    if (gateway !== PaymentGateway.BANK_TRANSFER && type.currency !== 'UZS') {
       throw new BadRequestException(
-        `${type.name} is priced in ${type.currency}; the payment gateways settle only in UZS.`,
+        `${type.name} is priced in ${type.currency}; the payment gateways settle only in UZS. ` +
+          `It can be paid by bank transfer instead.`,
       );
     }
 
@@ -62,13 +68,112 @@ export class PaymentsService {
           amountMinor: type.priceCents,
           currency: type.currency,
           durationDays: type.durationDays,
+          payerName: payer.payerName,
+          payerTaxId: payer.payerTaxId,
         },
       }));
+
+    // A bank transfer has nowhere to send the payer: they get an invoice and
+    // the association's account details instead.
+    if (gateway === PaymentGateway.BANK_TRANSFER) {
+      const withNumber = payment.invoiceNumber
+        ? payment
+        : await this.prisma.payment.update({
+            where: { id: payment.id },
+            data: { invoiceNumber: await this.nextInvoiceNumber() },
+          });
+      return { payment: withNumber, checkoutUrl: null, bankDetails: this.bankDetails() };
+    }
 
     return {
       payment,
       checkoutUrl: this.checkoutUrl(payment.id, payment.amountMinor, gateway),
+      bankDetails: null,
     };
+  }
+
+  /**
+   * "UZL-2026-0007". Sequential within the year so the association's
+   * accountant can file them, and derived from the count of invoices already
+   * raised this year rather than from a stored counter.
+   */
+  private async nextInvoiceNumber(): Promise<string> {
+    const year = new Date().getFullYear();
+    const soFar = await this.prisma.payment.count({
+      where: { invoiceNumber: { startsWith: `UZL-${year}-` } },
+    });
+    return `UZL-${year}-${String(soFar + 1).padStart(4, '0')}`;
+  }
+
+  /**
+   * Where the money goes. Configuration rather than code: these are the
+   * association's real banking details and they change without a deploy.
+   */
+  bankDetails() {
+    return {
+      beneficiary: this.config.get<string>('BANK_BENEFICIARY') ?? '',
+      account: this.config.get<string>('BANK_ACCOUNT') ?? '',
+      bankName: this.config.get<string>('BANK_NAME') ?? '',
+      mfo: this.config.get<string>('BANK_MFO') ?? '',
+      taxId: this.config.get<string>('BANK_TAX_ID') ?? '',
+      oked: this.config.get<string>('BANK_OKED') ?? '',
+      /** Empty until someone fills the environment in; the UI says so. */
+      configured: !!this.config.get<string>('BANK_ACCOUNT'),
+    };
+  }
+
+  /**
+   * Staff confirming the money arrived.
+   *
+   * The grant runs in the same transaction as the status change, exactly as the
+   * gateway path does — a crash between them would mean a paid invoice with no
+   * membership, or a membership nobody paid for. Confirming an already-paid
+   * invoice is refused rather than silently extending the membership twice.
+   */
+  async confirmBankTransfer(paymentId: string, staffUserId: string, note?: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const payment = await tx.payment.findUnique({ where: { id: paymentId } });
+      if (!payment) throw new NotFoundException('Payment not found');
+      if (payment.gateway !== PaymentGateway.BANK_TRANSFER) {
+        throw new BadRequestException('Only bank transfers are confirmed by hand.');
+      }
+      if (payment.status === PaymentStatus.PAID) {
+        throw new BadRequestException('This invoice is already marked as paid.');
+      }
+
+      const paid = await tx.payment.update({
+        where: { id: paymentId },
+        data: {
+          status: PaymentStatus.PAID,
+          paidAt: new Date(),
+          confirmedByUserId: staffUserId,
+          confirmedAt: new Date(),
+          staffNote: note,
+        },
+      });
+      await this.memberships.grant(tx, paid);
+      return paid;
+    });
+  }
+
+  /** Staff writing off an invoice nobody paid. Grants nothing. */
+  async cancelBankTransfer(paymentId: string, staffUserId: string, note?: string) {
+    const payment = await this.prisma.payment.findUnique({ where: { id: paymentId } });
+    if (!payment) throw new NotFoundException('Payment not found');
+    if (payment.status === PaymentStatus.PAID) {
+      throw new BadRequestException(
+        'This invoice is paid. Reversing it is a refund, not a cancellation.',
+      );
+    }
+    return this.prisma.payment.update({
+      where: { id: paymentId },
+      data: {
+        status: PaymentStatus.CANCELLED,
+        confirmedByUserId: staffUserId,
+        confirmedAt: new Date(),
+        staffNote: note,
+      },
+    });
   }
 
   /**
@@ -123,6 +228,7 @@ export class PaymentsService {
         durationDays: true,
         paidAt: true,
         createdAt: true,
+        invoiceNumber: true,
         membershipType: { select: { name: true, slug: true } },
       },
     });
@@ -142,6 +248,11 @@ export class PaymentsService {
         durationDays: true,
         paidAt: true,
         createdAt: true,
+        invoiceNumber: true,
+        payerName: true,
+        payerTaxId: true,
+        confirmedAt: true,
+        staffNote: true,
         gatewayTransactionId: true,
         user: { select: { id: true, email: true, fullName: true } },
         membershipType: { select: { name: true } },

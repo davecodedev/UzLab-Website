@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useLang, pick, type Lang } from "@/lib/i18n";
 import { Pager, pageSlice } from "@/components/Pager";
 import { formatCurrency, formatDateLong } from "@/lib/format";
+import Link from "next/link";
 import { MembershipCta } from "@/components/MembershipCta";
 
 export interface MembershipType {
@@ -37,6 +38,11 @@ const UI = {
     en: "Join the Association of Laboratories of Uzbekistan — access the method library, training and the industry directory.",
   },
   applyCta: { ru: "Подать заявку", uz: "Ariza topshirish", en: "Apply now" },
+  payByTransfer: {
+    ru: "Оплатить банковским переводом",
+    uz: "Bank o'tkazmasi orqali to'lash",
+    en: "Pay by bank transfer",
+  },
 
   typesKicker: { ru: "КАТЕГОРИИ И ВЗНОСЫ", uz: "TOIFALAR VA BADALLAR", en: "CATEGORIES AND FEES" },
   typesTitle: { ru: "Типы членства", uz: "A'zolik turlari", en: "Membership types" },
@@ -206,6 +212,18 @@ export function MembershipView({
           </p>
         </div>
         <MembershipCta className="shrink-0 sm:max-w-sm" />
+      </div>
+
+      {/* Card payment is not connected yet, so the way to actually pay is an
+          invoice. Stated plainly rather than left for someone to ask about. */}
+      <div className="mt-5">
+        <Link
+          href="/membership/pay"
+          className="inline-block rounded-lg px-5 py-2.5 text-sm font-semibold"
+          style={{ border: "1px solid var(--uz-border-strong)", color: "var(--uz-navy-900)" }}
+        >
+          {t("payByTransfer")}
+        </Link>
       </div>
 
       {/* MEMBERSHIP TYPES */}
