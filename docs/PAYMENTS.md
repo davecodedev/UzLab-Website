@@ -1,18 +1,32 @@
 # Payments
 
-Three ways to pay for membership. Two are card gateways that settle by
-themselves; the third is an invoice a person reconciles.
+## What the checkout offers
 
-| Method          | Grants membership          | Currency | Status |
-| --------------- | -------------------------- | -------- | ------ |
-| Click           | automatically, on Complete | UZS only | code ready, awaiting credentials |
-| Payme           | automatically, on Perform  | UZS only | code ready, awaiting credentials |
-| Bank transfer   | staff confirm by hand      | any      | live |
+**One route: a card through Click.** `/membership/pay` shows a membership
+type and a pay button, and nothing else. There is no method chooser — asking
+someone to decide between a card and a bank transfer before they have decided
+to join is a question they cannot answer yet.
 
-A gateway with no credentials set is reported as unavailable by
-`GET /api/payments/gateways`, and the checkout page hides it. That is
-deliberate: an option that redirects to a gateway which then rejects the
-request is worse than an option that is not offered.
+**Everything else is a conversation.** A tier priced in dollars, a gateway
+that is switched off, an organisation that fits none of the six types, a
+laboratory whose accounts department needs an invoice on a legal entity — all
+of them land on the same "talk to us about the price" panel, which is on the
+page permanently rather than only as an error state.
+
+| Method        | Grants membership          | Currency | Offered on the site |
+| ------------- | -------------------------- | -------- | ------------------- |
+| Click         | automatically, on Complete | UZS only | yes, when credentials are set |
+| Payme         | automatically, on Perform  | UZS only | no — code exists, not surfaced |
+| Bank transfer | staff confirm by hand      | any      | no — arranged by e-mail, confirmed in `/admin/payments` |
+
+Bank transfer is deliberately no longer self-service. The API and the staff
+queue still work, so a transfer agreed over e-mail is still recorded and still
+grants membership; members simply do not raise those invoices themselves.
+
+A gateway with no credentials is reported as unavailable by
+`GET /api/payments/gateways`, and the page replaces the pay button with an
+explanation. That is the point: an option that redirects to a gateway which
+then rejects the request is worse than an option that is not offered.
 
 ---
 
@@ -106,10 +120,14 @@ cabinet.
 ## Outstanding before Click can take money
 
 1. **The six membership tiers are priced in USD** ($800–$4,000/year). Neither
-   card gateway settles anything but so'm, so `createInvoice` refuses them
-   with an explanation and the checkout page shows the transfer route only.
-   Someone has to decide the so'm prices; then update
+   card gateway settles anything but so'm, so `createInvoice` refuses them and
+   the checkout page replaces the pay button with an explanation and a link to
+   contact us. Someone has to decide the so'm prices; then update
    `MembershipType.priceCents` (minor units — tiyin) and `currency` to `UZS`.
+
+   Until both this and the credentials are done, **nobody can pay through the
+   site at all** — every visitor to `/membership/pay` is routed to the contact
+   form. That is intentional and honest, but it is not a working checkout.
 2. **Fiscalisation (ИКПУ / фискальный чек).** Uzbek law requires a fiscal
    receipt for card payments to individuals. Click can issue it if we send the
    ИКПУ code and package for each membership tier. This is a question for the
