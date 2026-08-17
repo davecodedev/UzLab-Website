@@ -25,6 +25,7 @@ import { formatNumber, formatDateNumeric } from "@/lib/format";
 interface MembershipType {
   id: string;
   name: string;
+  slug: string;
   description: string;
   priceCents: number;
   currency: string;
@@ -116,13 +117,19 @@ export default function PayMembershipPage() {
   const [gateways, setGateways] = useState<Gateways | null>(null);
   const [mine, setMine] = useState<Invoice[]>([]);
 
-  const [typeId, setTypeId] = useState("");
+  /** `null` means "the visitor has not touched the select yet". */
+  const [typeId, setTypeId] = useState<string | null>(null);
+  const [wantedSlug, setWantedSlug] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- the token lives in the browser
+    // Both live in the browser: the token in localStorage, and the tier the
+    // visitor clicked on the membership page in the query string. Read from
+    // `location` rather than useSearchParams so the page stays static.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time hydrate from the browser
     setToken(getAccessToken());
+    setWantedSlug(new URLSearchParams(window.location.search).get("type"));
     setReady(true);
   }, []);
 
@@ -139,7 +146,13 @@ export default function PayMembershipPage() {
       .catch(() => setMine([]));
   }, [token]);
 
-  const selected = types.find((t) => t.id === typeId) ?? null;
+  // Derived rather than synced in an effect: the tier arrives from the query
+  // string, the list arrives from the API, and they land in either order.
+  const preselectedId = wantedSlug
+    ? (types.find((t) => t.slug === wantedSlug)?.id ?? "")
+    : "";
+  const chosenId = typeId ?? preselectedId;
+  const selected = types.find((t) => t.id === chosenId) ?? null;
 
   // `gateways === null` means the API has not answered yet — treated as "not
   // yet known" rather than "unavailable", so the page does not flash an
@@ -161,7 +174,7 @@ export default function PayMembershipPage() {
     try {
       const result = await api.post<{ checkoutUrl: string | null }>(
         "/payments/invoice",
-        { membershipTypeId: typeId, gateway: "CLICK" },
+        { membershipTypeId: chosenId, gateway: "CLICK" },
         getAccessToken() ?? undefined,
       );
 
@@ -211,8 +224,12 @@ export default function PayMembershipPage() {
           <p className="text-sm" style={{ color: "var(--uz-text)" }}>
             {pick(T.signIn, lang)}
           </p>
+          {/* Carries the tier through the sign-in round trip, so someone who
+              clicked "Pay" on a card does not land back on an empty select. */}
           <Link
-            href="/login?next=/membership/pay"
+            href={`/login?next=${encodeURIComponent(
+              wantedSlug ? `/membership/pay?type=${wantedSlug}` : "/membership/pay",
+            )}`}
             className="mt-4 inline-block rounded-lg px-5 py-2.5 text-sm font-semibold text-white"
             style={{ background: "var(--uz-blue-600)" }}
           >
@@ -231,7 +248,7 @@ export default function PayMembershipPage() {
             </label>
             <select
               required
-              value={typeId}
+              value={chosenId}
               onChange={(e) => setTypeId(e.target.value)}
               className={inputClass}
               style={inputStyle}

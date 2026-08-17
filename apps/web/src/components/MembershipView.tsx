@@ -38,11 +38,9 @@ const UI = {
     en: "Join the Association of Laboratories of Uzbekistan — access the method library, training and the industry directory.",
   },
   applyCta: { ru: "Подать заявку", uz: "Ariza topshirish", en: "Apply now" },
-  payByTransfer: {
-    ru: "Оплатить банковским переводом",
-    uz: "Bank o'tkazmasi orqali to'lash",
-    en: "Pay by bank transfer",
-  },
+  // On the card rather than once on the page: a single "pay" button forces the
+  // reader to hold a choice in their head all the way to the next screen.
+  buy: { ru: "Оплатить", uz: "To'lash", en: "Pay" },
 
   typesKicker: { ru: "КАТЕГОРИИ И ВЗНОСЫ", uz: "TOIFALAR VA BADALLAR", en: "CATEGORIES AND FEES" },
   typesTitle: { ru: "Типы членства", uz: "A'zolik turlari", en: "Membership types" },
@@ -144,6 +142,19 @@ function TierCard({ type, featured, lang }: { type: MembershipType; featured: bo
       <p className="mt-4 flex-1 text-sm leading-relaxed" style={{ color: "var(--uz-text-muted)" }}>
         {type.description}
       </p>
+      {/* The slug, not the id: it survives a reseeded database and is legible
+          in the address bar, which matters when someone sends the link on. */}
+      <Link
+        href={`/membership/pay?type=${encodeURIComponent(type.slug)}`}
+        className="mt-5 block rounded-lg px-5 py-2.5 text-center text-sm font-semibold"
+        style={
+          featured
+            ? { background: "var(--uz-blue-600)", color: "#ffffff" }
+            : { border: "1px solid var(--uz-border-strong)", color: "var(--uz-navy-900)" }
+        }
+      >
+        {pick(UI.buy, lang)}
+      </Link>
     </div>
   );
 }
@@ -212,18 +223,6 @@ export function MembershipView({
           </p>
         </div>
         <MembershipCta className="shrink-0 sm:max-w-sm" />
-      </div>
-
-      {/* Card payment is not connected yet, so the way to actually pay is an
-          invoice. Stated plainly rather than left for someone to ask about. */}
-      <div className="mt-5">
-        <Link
-          href="/membership/pay"
-          className="inline-block rounded-lg px-5 py-2.5 text-sm font-semibold"
-          style={{ border: "1px solid var(--uz-border-strong)", color: "var(--uz-navy-900)" }}
-        >
-          {t("payByTransfer")}
-        </Link>
       </div>
 
       {/* MEMBERSHIP TYPES */}
