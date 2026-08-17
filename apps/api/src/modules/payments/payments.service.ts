@@ -186,7 +186,9 @@ export class PaymentsService {
     amountMinor: number,
     gateway: PaymentGateway,
   ): string {
-    const returnUrl = `${this.config.get<string>('WEB_URL') ?? 'https://uzlabuz.vercel.app'}/account`;
+    // WEB_URL is set in the environment; the fallback is the public site so a
+    // misconfiguration sends the payer somewhere real rather than to localhost.
+    const returnUrl = `${this.config.get<string>('WEB_URL') ?? 'https://uzlab.org'}/account`;
 
     if (gateway === PaymentGateway.PAYME) {
       const merchantId = this.config.get<string>('PAYME_MERCHANT_ID') ?? '';
