@@ -8,16 +8,19 @@ import { useLang, pick } from "@/lib/i18n";
 import { formatNumber, formatDateNumeric } from "@/lib/format";
 
 /**
- * Paying for membership by bank transfer.
+ * Paying for membership.
  *
- * The card gateways are not connected yet, and for most laboratories here a
- * transfer against an invoice is the normal way to pay anyway — their accounts
+ * Two routes. A card through Click, which settles by itself and grants the
+ * membership the moment Click confirms — offered only when the tier is priced
+ * in so'm and Click's credentials are actually set, because anything else ends
+ * at a gateway error page. And a bank transfer against an invoice, which for
+ * most laboratories here is the normal way to pay anyway: their accounts
  * department needs a document with a legal name and a tax id on it, not a card
- * form. So this is not only a stopgap.
+ * form.
  *
- * Nothing is granted here. The invoice is raised, the payer is told what to
- * transfer and what reference to quote, and a member of staff confirms it
- * against the bank statement afterwards.
+ * The transfer route grants nothing on its own. The invoice is raised, the
+ * payer is told what to send and what reference to quote, and a member of
+ * staff confirms it against the bank statement afterwards.
  */
 
 interface MembershipType {
@@ -48,14 +51,43 @@ interface Invoice {
   createdAt: string;
 }
 
+interface GatewayInfo {
+  available: boolean;
+  currencies: string[] | null;
+}
+type Gateways = Record<"CLICK" | "PAYME" | "BANK_TRANSFER", GatewayInfo>;
+
+type Method = "CLICK" | "BANK_TRANSFER";
+
 const T = {
   breadcrumbHome: { ru: "Главная", uz: "Bosh sahifa", en: "Home" },
   title: { ru: "Оплата членства", uz: "A'zolikni to'lash", en: "Pay for membership" },
   intro: {
-    ru: "Выставим счёт на оплату банковским переводом. Членство активируется после поступления средств — обычно в течение одного рабочего дня после зачисления.",
-    uz: "Bank o'tkazmasi orqali to'lash uchun hisob-faktura beramiz. A'zolik mablag' kelib tushgandan so'ng faollashtiriladi — odatda bir ish kuni ichida.",
-    en: "We will raise an invoice for payment by bank transfer. Membership is activated once the money arrives — usually within one working day of it clearing.",
+    ru: "Оплатите картой через Click — членство активируется сразу — или выставьте счёт на банковский перевод. При переводе членство активируется после поступления средств, обычно в течение одного рабочего дня.",
+    uz: "Click orqali karta bilan to'lang — a'zolik darhol faollashtiriladi — yoki bank o'tkazmasi uchun hisob-faktura oling. O'tkazmada a'zolik mablag' kelib tushgandan so'ng, odatda bir ish kuni ichida faollashtiriladi.",
+    en: "Pay by card through Click and membership starts at once, or raise an invoice for a bank transfer. With a transfer, membership starts once the money arrives — usually within one working day.",
   },
+
+  methodHeading: { ru: "Способ оплаты", uz: "To'lov usuli", en: "How to pay" },
+  methodCard: { ru: "Картой через Click", uz: "Click orqali karta bilan", en: "By card via Click" },
+  methodCardHint: {
+    ru: "UzCard, Humo и Visa. Членство активируется сразу после оплаты.",
+    uz: "UzCard, Humo va Visa. A'zolik to'lovdan so'ng darhol faollashtiriladi.",
+    en: "UzCard, Humo and Visa. Membership starts as soon as the payment clears.",
+  },
+  methodBank: { ru: "Банковский перевод", uz: "Bank o'tkazmasi", en: "Bank transfer" },
+  methodBankHint: {
+    ru: "Счёт с реквизитами для бухгалтерии. Активируем после зачисления.",
+    uz: "Buxgalteriya uchun rekvizitli hisob-faktura. Mablag' kelgach faollashtiramiz.",
+    en: "An invoice with account details for your accounts department. Activated once it clears.",
+  },
+  cardUnavailableCurrency: {
+    ru: "Этот тип членства указан не в сумах, поэтому картой его оплатить нельзя — доступен банковский перевод.",
+    uz: "Bu a'zolik turi so'mda ko'rsatilmagan, shuning uchun uni karta bilan to'lash mumkin emas — bank o'tkazmasi mavjud.",
+    en: "This tier is not priced in so'm, so it cannot be paid by card — a bank transfer is available instead.",
+  },
+  payByCard: { ru: "Перейти к оплате", uz: "To'lovga o'tish", en: "Continue to payment" },
+  redirecting: { ru: "Переходим в Click…", uz: "Click'ga o'tilmoqda…", en: "Taking you to Click…" },
   signIn: {
     ru: "Войдите, чтобы выставить счёт.",
     uz: "Hisob-faktura olish uchun tizimga kiring.",
@@ -124,8 +156,10 @@ export default function PayMembershipPage() {
   const [token, setToken] = useState<string | null>(null);
   const [types, setTypes] = useState<MembershipType[]>([]);
   const [bank, setBank] = useState<BankDetails | null>(null);
+  const [gateways, setGateways] = useState<Gateways | null>(null);
   const [mine, setMine] = useState<Invoice[]>([]);
 
+  const [method, setMethod] = useState<Method>("BANK_TRANSFER");
   const [typeId, setTypeId] = useState("");
   const [payerName, setPayerName] = useState("");
   const [payerTaxId, setPayerTaxId] = useState("");
@@ -142,6 +176,7 @@ export default function PayMembershipPage() {
   useEffect(() => {
     api.get<MembershipType[]>("/membership/types").then(setTypes).catch(() => setTypes([]));
     api.get<BankDetails>("/payments/bank-details").then(setBank).catch(() => setBank(null));
+    api.get<Gateways>("/payments/gateways").then(setGateways).catch(() => setGateways(null));
   }, []);
 
   useEffect(() => {
@@ -152,28 +187,51 @@ export default function PayMembershipPage() {
       .catch(() => setMine([]));
   }, [token]);
 
+  const selected = types.find((t) => t.id === typeId) ?? null;
+
+  // Card payment needs both halves to be true: Click switched on at our end,
+  // and a tier the gateway can actually settle. Anything else is a bank
+  // transfer, and the page says why rather than hiding the option silently.
+  const cardPossible =
+    !!gateways?.CLICK.available && !!selected && selected.currency === "UZS";
+  const cardBlockedByCurrency =
+    !!gateways?.CLICK.available && !!selected && selected.currency !== "UZS";
+  const effectiveMethod: Method = cardPossible ? method : "BANK_TRANSFER";
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      const result = await api.post<{ payment: Invoice; bankDetails: BankDetails }>(
+      const result = await api.post<{
+        payment: Invoice;
+        checkoutUrl: string | null;
+        bankDetails: BankDetails | null;
+      }>(
         "/payments/invoice",
         {
           membershipTypeId: typeId,
-          gateway: "BANK_TRANSFER",
+          gateway: effectiveMethod,
           payerName: payerName || undefined,
           payerTaxId: payerTaxId || undefined,
         },
         getAccessToken() ?? undefined,
       );
+
+      // Returning early leaves `busy` set on purpose: the tab is about to
+      // navigate to Click, and re-enabling the button in the meantime invites
+      // a second click and a second invoice.
+      if (result.checkoutUrl) {
+        window.location.href = result.checkoutUrl;
+        return;
+      }
+
       setInvoice(result.payment);
       if (result.bankDetails) setBank(result.bankDetails);
     } catch (e) {
       setError(e instanceof ApiError && e.message ? e.message : pick(T.failed, lang));
-    } finally {
-      setBusy(false);
     }
+    setBusy(false);
   }
 
   if (!ready) return null;
@@ -244,7 +302,40 @@ export default function PayMembershipPage() {
             </select>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          {cardPossible && (
+            <fieldset>
+              <legend className="mb-1 block text-[13px] font-semibold" style={{ color: "var(--uz-text)" }}>
+                {pick(T.methodHeading, lang)}
+              </legend>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <MethodOption
+                  checked={effectiveMethod === "CLICK"}
+                  onSelect={() => setMethod("CLICK")}
+                  label={pick(T.methodCard, lang)}
+                  hint={pick(T.methodCardHint, lang)}
+                />
+                <MethodOption
+                  checked={effectiveMethod === "BANK_TRANSFER"}
+                  onSelect={() => setMethod("BANK_TRANSFER")}
+                  label={pick(T.methodBank, lang)}
+                  hint={pick(T.methodBankHint, lang)}
+                />
+              </div>
+            </fieldset>
+          )}
+
+          {cardBlockedByCurrency && (
+            <p className="text-[13px]" style={{ color: "var(--uz-text-muted)" }}>
+              {pick(T.cardUnavailableCurrency, lang)}
+            </p>
+          )}
+
+          {/* The invoice is made out to a legal entity, which a card payment
+              does not need — so these only appear on the transfer route. */}
+          <div
+            className="grid gap-3 sm:grid-cols-2"
+            hidden={effectiveMethod === "CLICK"}
+          >
             <div>
               <label className="mb-1 block text-[13px] font-semibold" style={{ color: "var(--uz-text)" }}>
                 {pick(T.payerName, lang)}
@@ -281,7 +372,13 @@ export default function PayMembershipPage() {
             className="rounded-md px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
             style={{ background: "var(--uz-blue-600)" }}
           >
-            {busy ? pick(T.requesting, lang) : pick(T.request, lang)}
+            {effectiveMethod === "CLICK"
+              ? busy
+                ? pick(T.redirecting, lang)
+                : pick(T.payByCard, lang)
+              : busy
+                ? pick(T.requesting, lang)
+                : pick(T.request, lang)}
           </button>
         </form>
       )}
@@ -315,6 +412,49 @@ export default function PayMembershipPage() {
         </section>
       )}
     </div>
+  );
+}
+
+/**
+ * A radio that is the whole card, not a dot beside a word — the hit area on a
+ * phone is the reason, and the real <input> stays in the markup so the choice
+ * is still reachable by keyboard and announced as a radio.
+ */
+function MethodOption({
+  checked,
+  onSelect,
+  label,
+  hint,
+}: {
+  checked: boolean;
+  onSelect: () => void;
+  label: string;
+  hint: string;
+}) {
+  return (
+    <label
+      className="flex cursor-pointer gap-2.5 rounded-lg border p-3"
+      style={{
+        borderColor: checked ? "var(--uz-blue-600)" : "var(--uz-border)",
+        background: checked ? "var(--uz-blue-50)" : "#ffffff",
+      }}
+    >
+      <input
+        type="radio"
+        name="payment-method"
+        checked={checked}
+        onChange={onSelect}
+        className="mt-0.5 shrink-0"
+      />
+      <span>
+        <span className="block text-[13.5px] font-semibold" style={{ color: "var(--uz-navy-900)" }}>
+          {label}
+        </span>
+        <span className="mt-0.5 block text-[12.5px]" style={{ color: "var(--uz-text-muted)" }}>
+          {hint}
+        </span>
+      </span>
+    </label>
   );
 }
 

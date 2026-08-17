@@ -1,4 +1,10 @@
-import { IsEnum, IsOptional, IsString, MaxLength, IsUUID } from 'class-validator';
+import {
+  IsEnum,
+  IsOptional,
+  IsString,
+  MaxLength,
+  IsUUID,
+} from 'class-validator';
 import { PaymentGateway } from '@prisma/client';
 
 export class CreateInvoiceDto {

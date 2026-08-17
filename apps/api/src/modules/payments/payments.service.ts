@@ -7,6 +7,7 @@ import { ConfigService } from '@nestjs/config';
 import { PaymentGateway, PaymentStatus } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
 import { MembershipsService } from './memberships.service.js';
+import { ClickService } from './click.service.js';
 
 /**
  * Raising an invoice and pointing the payer at a gateway.
@@ -21,7 +22,31 @@ export class PaymentsService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly memberships: MembershipsService,
+    private readonly click: ClickService,
   ) {}
+
+  /**
+   * Which ways of paying are actually usable right now, for the checkout page
+   * to render. A gateway whose credentials are missing is reported as
+   * unavailable rather than shown and then failing at the redirect — and the
+   * currency restriction is stated here too, because a tier priced in dollars
+   * cannot go through either card gateway.
+   */
+  gateways() {
+    return {
+      CLICK: { available: this.click.configured, currencies: ['UZS'] },
+      PAYME: {
+        available:
+          !!this.config.get<string>('PAYME_MERCHANT_ID') &&
+          !!this.config.get<string>('PAYME_MERCHANT_KEY'),
+        currencies: ['UZS'],
+      },
+      // Nothing to configure: an invoice can always be raised. Whether the
+      // account details are published is a separate question, answered by
+      // `bankDetails().configured`.
+      BANK_TRANSFER: { available: true, currencies: null },
+    };
+  }
 
   async createInvoice(
     userId: string,
@@ -42,6 +67,15 @@ export class PaymentsService {
       throw new BadRequestException(
         `${type.name} is priced in ${type.currency}; the payment gateways settle only in UZS. ` +
           `It can be paid by bank transfer instead.`,
+      );
+    }
+
+    // Refuse before the row is written. An invoice pointing at a gateway we
+    // have no credentials for is worse than no invoice: it looks payable, and
+    // the payer only discovers otherwise at Click's own error page.
+    if (!this.gateways()[gateway].available) {
+      throw new BadRequestException(
+        `${gateway} is not available yet. Please pay by bank transfer.`,
       );
     }
 
@@ -82,7 +116,11 @@ export class PaymentsService {
             where: { id: payment.id },
             data: { invoiceNumber: await this.nextInvoiceNumber() },
           });
-      return { payment: withNumber, checkoutUrl: null, bankDetails: this.bankDetails() };
+      return {
+        payment: withNumber,
+        checkoutUrl: null,
+        bankDetails: this.bankDetails(),
+      };
     }
 
     return {
@@ -130,15 +168,23 @@ export class PaymentsService {
    * membership, or a membership nobody paid for. Confirming an already-paid
    * invoice is refused rather than silently extending the membership twice.
    */
-  async confirmBankTransfer(paymentId: string, staffUserId: string, note?: string) {
+  async confirmBankTransfer(
+    paymentId: string,
+    staffUserId: string,
+    note?: string,
+  ) {
     return this.prisma.$transaction(async (tx) => {
       const payment = await tx.payment.findUnique({ where: { id: paymentId } });
       if (!payment) throw new NotFoundException('Payment not found');
       if (payment.gateway !== PaymentGateway.BANK_TRANSFER) {
-        throw new BadRequestException('Only bank transfers are confirmed by hand.');
+        throw new BadRequestException(
+          'Only bank transfers are confirmed by hand.',
+        );
       }
       if (payment.status === PaymentStatus.PAID) {
-        throw new BadRequestException('This invoice is already marked as paid.');
+        throw new BadRequestException(
+          'This invoice is already marked as paid.',
+        );
       }
 
       const paid = await tx.payment.update({
@@ -157,8 +203,14 @@ export class PaymentsService {
   }
 
   /** Staff writing off an invoice nobody paid. Grants nothing. */
-  async cancelBankTransfer(paymentId: string, staffUserId: string, note?: string) {
-    const payment = await this.prisma.payment.findUnique({ where: { id: paymentId } });
+  async cancelBankTransfer(
+    paymentId: string,
+    staffUserId: string,
+    note?: string,
+  ) {
+    const payment = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+    });
     if (!payment) throw new NotFoundException('Payment not found');
     if (payment.status === PaymentStatus.PAID) {
       throw new BadRequestException(
@@ -204,16 +256,16 @@ export class PaymentsService {
       return `https://checkout.paycom.uz/${Buffer.from(params).toString('base64')}`;
     }
 
-    const serviceId = this.config.get<string>('CLICK_SERVICE_ID') ?? '';
-    const merchantId = this.config.get<string>('CLICK_MERCHANT_ID') ?? '';
-    const amountSom = (amountMinor / 100).toFixed(2);
-    return (
-      `https://my.click.uz/services/pay?service_id=${serviceId}` +
-      `&merchant_id=${merchantId}` +
-      `&amount=${amountSom}` +
-      `&transaction_param=${paymentId}` +
-      `&return_url=${encodeURIComponent(returnUrl)}`
-    );
+    // `transaction_param` is what comes back as `merchant_trans_id` on both
+    // callbacks, so it has to be the payment id and nothing else.
+    const params = new URLSearchParams({
+      service_id: this.config.get<string>('CLICK_SERVICE_ID') ?? '',
+      merchant_id: this.config.get<string>('CLICK_MERCHANT_ID') ?? '',
+      amount: (amountMinor / 100).toFixed(2),
+      transaction_param: paymentId,
+      return_url: returnUrl,
+    });
+    return `https://my.click.uz/services/pay?${params.toString()}`;
   }
 
   /** A member's own payment history. */

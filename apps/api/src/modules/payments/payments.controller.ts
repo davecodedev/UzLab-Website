@@ -14,7 +14,10 @@ import { PaymentsService } from './payments.service.js';
 import { PaymeService } from './payme.service.js';
 import { PaymeError, PaymeErrorCode } from './payme.errors.js';
 import { ClickService, type ClickCallback } from './click.service.js';
-import { ConfirmPaymentDto, CreateInvoiceDto } from './dto/create-invoice.dto.js';
+import {
+  ConfirmPaymentDto,
+  CreateInvoiceDto,
+} from './dto/create-invoice.dto.js';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../../common/guards/roles.guard.js';
@@ -47,6 +50,15 @@ export class PaymentsController {
   @Get('bank-details')
   bankDetails() {
     return this.payments.bankDetails();
+  }
+
+  /**
+   * Which payment methods the checkout page may offer. Public: it says what is
+   * switched on, never how it is authenticated.
+   */
+  @Get('gateways')
+  gateways() {
+    return this.payments.gateways();
   }
 
   @UseGuards(JwtAuthGuard)
