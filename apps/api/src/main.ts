@@ -33,8 +33,17 @@ async function bootstrap() {
     }),
   );
 
+  // Comma-separated, because the site is reachable on more than one name: its
+  // own domain, the www form of it, and the Vercel host the deployments land
+  // on. A single value silently blocked every browser call from the others.
+  const origins = config
+    .get<string>('CORS_ORIGIN', 'http://localhost:3000')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+
   app.enableCors({
-    origin: config.get<string>('CORS_ORIGIN', 'http://localhost:3000'),
+    origin: origins.length === 1 ? origins[0] : origins,
     credentials: true,
   });
 
