@@ -7,15 +7,21 @@ type and a pay button, and nothing else. There is no method chooser — asking
 someone to decide between a card and a bank transfer before they have decided
 to join is a question they cannot answer yet.
 
-**Everything else is a conversation.** A tier priced in dollars, a gateway
-that is switched off, an organisation that fits none of the six types, a
-laboratory whose accounts department needs an invoice on a legal entity — all
-of them land on the same "talk to us about the price" panel, which is on the
-page permanently rather than only as an error state.
+**Everything else is a conversation.** A gateway that is switched off, an
+organisation that fits none of the six packages, a laboratory whose accounts
+department needs an invoice on a legal entity — all of them land on the same
+"talk to us about the price" panel, which is on the page permanently rather
+than only as an error state.
+
+**Pricing** comes from the association's own price list and lives in
+`apps/api/scripts/seed-membership-pricing.ts`. Two categories, three packages
+each, monthly and annual for every package — twelve `MembershipType` rows.
+Re-run it with `npm run seed:membership-pricing --workspace apps/api` after
+editing; it upserts by slug, so existing members keep their type.
 
 | Method        | Grants membership          | Currency | Offered on the site |
 | ------------- | -------------------------- | -------- | ------------------- |
-| Click         | automatically, on Complete | UZS only | yes, when credentials are set |
+| Click         | automatically, on Complete | UZS only | yes, when credentials are set (every tier is now UZS) |
 | Payme         | automatically, on Perform  | UZS only | no — code exists, not surfaced |
 | Bank transfer | staff confirm by hand      | any      | no — arranged by e-mail, confirmed in `/admin/payments` |
 
@@ -119,15 +125,11 @@ cabinet.
 
 ## Outstanding before Click can take money
 
-1. **The six membership tiers are priced in USD** ($800–$4,000/year). Neither
-   card gateway settles anything but so'm, so `createInvoice` refuses them and
-   the checkout page replaces the pay button with an explanation and a link to
-   contact us. Someone has to decide the so'm prices; then update
-   `MembershipType.priceCents` (minor units — tiyin) and `currency` to `UZS`.
+1. ~~The membership tiers are priced in USD.~~ **Done.** All twelve tiers are
+   in so'm, from the association's own price list — 5 / 7.5 / 10 million a
+   year, or 500 000 / 750 000 / 1 000 000 a month. `createInvoice` will accept
+   any of them the moment Click has credentials.
 
-   Until both this and the credentials are done, **nobody can pay through the
-   site at all** — every visitor to `/membership/pay` is routed to the contact
-   form. That is intentional and honest, but it is not a working checkout.
 2. **Fiscalisation (ИКПУ / фискальный чек).** Uzbek law requires a fiscal
    receipt for card payments to individuals. Click can issue it if we send the
    ИКПУ code and package for each membership tier. This is a question for the
