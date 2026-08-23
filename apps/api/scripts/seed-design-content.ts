@@ -1,68 +1,15 @@
-// Seeds the real MembershipType and NewsArticle tables with the content
-// specified in the Claude Design brief (pricing tiers, recent news items) —
-// so the membership and news pages stay driven by real, admin-editable data
-// instead of hardcoded frontend copy. Idempotent (upsert by unique slug).
+// Seeds the NewsArticle table, so the news page stays driven by
+// admin-editable data instead of hardcoded frontend copy. Idempotent
+// (upsert by unique slug).
+//
+// Membership types used to live here too, with invented prices and invented
+// joining fees. They are now in seed-membership-pricing.ts, transcribed from
+// the association's own price list — do not re-add them here, or running this
+// script would overwrite the real figures with the made-up ones.
 // Run with: npm run seed:design-content --workspace=apps/api
 import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
-
-const MEMBERSHIP_TYPES = [
-  {
-    name: 'Лаборатория — малая (до 10 сотрудников)',
-    slug: 'laboratory-small',
-    description:
-      'Испытательные, калибровочные, медицинские, производственные и ведомственные лаборатории. Внедрение и поддержание ISO/IEC 17025, методическая помощь по актуализации НД, сопровождение при подготовке к аккредитации, обучающие семинары и калибровка СИ, участие в рабочих группах ассоциации. Вступительный взнос — 500 USD (единоразово), далее годовой взнос ниже.',
-    priceCents: 80000,
-    currency: 'USD',
-    durationDays: 365,
-  },
-  {
-    name: 'Лаборатория — средняя (10–30 сотрудников)',
-    slug: 'laboratory-medium',
-    description:
-      'Испытательные, калибровочные, медицинские, производственные и ведомственные лаборатории. Внедрение и поддержание ISO/IEC 17025, методическая помощь по актуализации НД, сопровождение при подготовке к аккредитации, обучающие семинары и калибровка СИ, участие в рабочих группах ассоциации. Вступительный взнос — 800 USD (единоразово), далее годовой взнос ниже.',
-    priceCents: 120000,
-    currency: 'USD',
-    durationDays: 365,
-  },
-  {
-    name: 'Лаборатория — крупная (30+ сотрудников)',
-    slug: 'laboratory-large',
-    description:
-      'Испытательные, калибровочные, медицинские, производственные и ведомственные лаборатории. Внедрение и поддержание ISO/IEC 17025, методическая помощь по актуализации НД, сопровождение при подготовке к аккредитации, обучающие семинары и калибровка СИ, участие в рабочих группах ассоциации. Вступительный взнос — 1 000 USD (единоразово), далее годовой взнос ниже.',
-    priceCents: 180000,
-    currency: 'USD',
-    durationDays: 365,
-  },
-  {
-    name: 'Ассоциированный член — малая компания',
-    slug: 'associate-small',
-    description:
-      'Производители и дистрибьюторы средств измерений, стандартных образцов, реактивов и оборудования. Доступ к профессиональному сообществу лабораторий, информподдержка и продвижение продукции, участие в профильных мероприятиях, консультации по нормативным требованиям, размещение в каталоге и на сайте ассоциации. Вступительный взнос — 1 000 USD (единоразово), далее годовой взнос ниже.',
-    priceCents: 150000,
-    currency: 'USD',
-    durationDays: 365,
-  },
-  {
-    name: 'Ассоциированный член — средняя компания',
-    slug: 'associate-medium',
-    description:
-      'Производители и дистрибьюторы средств измерений, стандартных образцов, реактивов и оборудования. Доступ к профессиональному сообществу лабораторий, информподдержка и продвижение продукции, участие в профильных мероприятиях, консультации по нормативным требованиям, размещение в каталоге и на сайте ассоциации. Вступительный взнос — 1 500 USD (единоразово), далее годовой взнос ниже.',
-    priceCents: 250000,
-    currency: 'USD',
-    durationDays: 365,
-  },
-  {
-    name: 'Ассоциированный член — крупная компания',
-    slug: 'associate-large',
-    description:
-      'Производители и дистрибьюторы средств измерений, стандартных образцов, реактивов и оборудования. Доступ к профессиональному сообществу лабораторий, информподдержка и продвижение продукции, участие в профильных мероприятиях, консультации по нормативным требованиям, размещение в каталоге и на сайте ассоциации. Вступительный взнос — 2 000 USD (единоразово), далее годовой взнос ниже.',
-    priceCents: 400000,
-    currency: 'USD',
-    durationDays: 365,
-  },
-];
 
 const NEWS_ARTICLES = [
   {
@@ -122,15 +69,6 @@ const NEWS_ARTICLES = [
 async function main() {
   const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
   const prisma = new PrismaClient({ adapter });
-
-  for (const type of MEMBERSHIP_TYPES) {
-    await prisma.membershipType.upsert({
-      where: { slug: type.slug },
-      update: type,
-      create: type,
-    });
-  }
-  console.log(`Upserted ${MEMBERSHIP_TYPES.length} membership types.`);
 
   for (const article of NEWS_ARTICLES) {
     await prisma.newsArticle.upsert({

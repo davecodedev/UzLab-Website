@@ -5,10 +5,14 @@ import type { Lang } from "@/lib/i18n";
  * price list.
  *
  * Everything here is transcribed from that document and nothing is inferred.
- * The page it replaced carried invented courses, invented enrolment dates and
- * an invented member discount; none of those exist in the source, so none of
- * them are here. Where the source is silent — when a course next runs, whether
- * members pay less — the page says nothing rather than filling the space.
+ * The page it replaced carried invented courses and invented enrolment dates;
+ * neither exists in the source, so neither is here. Where the source is silent
+ * — when a course next runs — the page says nothing rather than filling the
+ * space.
+ *
+ * The 20 % member discount shown on the page is deliberately not in this file:
+ * it comes from the association's own price list, not the provider's, and the
+ * figures below are what Triple Point Engineering charges before it.
  */
 
 type L10n = Record<Lang, string>;

@@ -41,6 +41,10 @@ const UI = {
   // On the card rather than once on the page: a single "pay" button forces the
   // reader to hold a choice in their head all the way to the next screen.
   buy: { ru: "Оплатить", uz: "To'lash", en: "Pay" },
+  buyYear: { ru: "Оплатить год", uz: "Yillik to'lov", en: "Pay for a year" },
+  buyMonth: { ru: "Оплатить месяц", uz: "Oylik to'lov", en: "Pay for a month" },
+  perMonthNote: { ru: "или помесячно", uz: "yoki oylik", en: "or monthly" },
+  includes: { ru: "Что входит", uz: "Nimalar kiradi", en: "What is included" },
 
   typesKicker: { ru: "КАТЕГОРИИ И ВЗНОСЫ", uz: "TOIFALAR VA BADALLAR", en: "CATEGORIES AND FEES" },
   typesTitle: { ru: "Типы членства", uz: "A'zolik turlari", en: "Membership types" },
@@ -49,8 +53,17 @@ const UI = {
     uz: "A'zolik toifalari hali sozlanmagan.",
     en: "Membership categories have not been set up yet.",
   },
-  groupLaboratory: { ru: "Члены — лаборатории", uz: "A'zolar — laboratoriyalar", en: "Members — laboratories" },
-  groupAssociate: { ru: "Ассоциированные члены", uz: "Assotsiatsiyalashgan a'zolar", en: "Associate members" },
+  // The association's own wording for the two categories, from its price list.
+  groupLaboratory: {
+    ru: "Полноправные члены — органы оценки соответствия",
+    uz: "To'liq huquqli a'zolar — muvofiqlikni baholash organlari",
+    en: "Full members — conformity assessment bodies",
+  },
+  groupAssociate: {
+    ru: "Ассоциированные члены — производители и дистрибьюторы оборудования",
+    uz: "Assotsiatsiyalashgan a'zolar — uskunalar ishlab chiqaruvchi va distribyutorlari",
+    en: "Associate members — equipment manufacturers and distributors",
+  },
   groupOther: { ru: "Другие категории", uz: "Boshqa toifalar", en: "Other categories" },
   featuredBadge: { ru: "Популярный выбор", uz: "Ommabop tanlov", en: "Popular choice" },
 
@@ -106,7 +119,80 @@ function Kicker({ label }: { label: string }) {
   );
 }
 
-function TierCard({ type, featured, lang }: { type: MembershipType; featured: boolean; lang: Lang }) {
+/**
+ * The price list gives every package both a monthly and an annual fee, so the
+ * two live as separate MembershipType rows — the payment record has to know
+ * which was bought. Pairing them back into one card is this function's job:
+ * three cards per category, not six near-identical ones.
+ */
+interface Package {
+  base: string;
+  annual: MembershipType | null;
+  monthly: MembershipType | null;
+}
+
+function toPackages(types: MembershipType[]): Package[] {
+  const byBase = new Map<string, Package>();
+  for (const type of types) {
+    const base = type.slug.replace(/-monthly$/, "");
+    const pkg = byBase.get(base) ?? { base, annual: null, monthly: null };
+    if (type.slug.endsWith("-monthly")) pkg.monthly = type;
+    else pkg.annual = type;
+    byBase.set(base, pkg);
+  }
+  // Cheapest first. The API's own order is by creation, which says nothing to
+  // a reader comparing packages.
+  return [...byBase.values()].sort(
+    (a, b) => (a.annual ?? a.monthly)!.priceCents - (b.annual ?? b.monthly)!.priceCents,
+  );
+}
+
+/**
+ * The lead sentence, then one benefit per line. `description` is the only
+ * free-text column a membership type has, and the packages are list-shaped, so
+ * the seed writes them newline-separated and the card renders the tail as
+ * bullets. A description with no newlines still renders correctly, as one
+ * paragraph and no list.
+ */
+function splitDescription(description: string) {
+  const lines = description
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  return { lead: lines[0] ?? "", benefits: lines.slice(1) };
+}
+
+function PayLink({
+  type,
+  label,
+  primary,
+}: {
+  type: MembershipType;
+  label: string;
+  primary: boolean;
+}) {
+  return (
+    // The slug, not the id: it survives a reseeded database and is legible in
+    // the address bar, which matters when someone sends the link on.
+    <Link
+      href={`/membership/pay?type=${encodeURIComponent(type.slug)}`}
+      className="block flex-1 rounded-lg px-4 py-2.5 text-center text-sm font-semibold"
+      style={
+        primary
+          ? { background: "var(--uz-blue-600)", color: "#ffffff" }
+          : { border: "1px solid var(--uz-border-strong)", color: "var(--uz-navy-900)" }
+      }
+    >
+      {label}
+    </Link>
+  );
+}
+
+function TierCard({ pkg, featured, lang }: { pkg: Package; featured: boolean; lang: Lang }) {
+  const headline = pkg.annual ?? pkg.monthly;
+  if (!headline) return null;
+  const { lead, benefits } = splitDescription(headline.description);
+
   return (
     <div
       className="relative flex flex-col rounded-xl bg-white p-6"
@@ -124,43 +210,89 @@ function TierCard({ type, featured, lang }: { type: MembershipType; featured: bo
         </span>
       )}
       <h4 className="text-lg font-bold leading-snug" style={{ color: "var(--uz-navy-900)" }}>
-        {type.name}
+        {headline.name}
       </h4>
+
       <p
         className="mt-3 text-2xl font-extrabold"
         style={{ fontFamily: "var(--uz-font-display)", color: "var(--uz-navy-900)" }}
       >
-        {formatPrice(type.priceCents, type.currency, lang)}
+        {formatPrice(headline.priceCents, headline.currency, lang)}
         <span
           className="ml-1.5 text-sm font-medium"
           style={{ color: "var(--uz-text-muted)", fontFamily: "var(--uz-font-body)" }}
         >
           {" "}
-          / {formatDuration(type.durationDays, lang)}
+          / {formatDuration(headline.durationDays, lang)}
         </span>
       </p>
-      <p className="mt-4 flex-1 text-sm leading-relaxed" style={{ color: "var(--uz-text-muted)" }}>
-        {type.description}
-      </p>
-      {/* The slug, not the id: it survives a reseeded database and is legible
-          in the address bar, which matters when someone sends the link on. */}
-      <Link
-        href={`/membership/pay?type=${encodeURIComponent(type.slug)}`}
-        className="mt-5 block rounded-lg px-5 py-2.5 text-center text-sm font-semibold"
-        style={
-          featured
-            ? { background: "var(--uz-blue-600)", color: "#ffffff" }
-            : { border: "1px solid var(--uz-border-strong)", color: "var(--uz-navy-900)" }
-        }
-      >
-        {pick(UI.buy, lang)}
-      </Link>
+
+      {/* Only when both exist: the annual figure is the headline, and the
+          monthly one is what it is being compared against. */}
+      {pkg.annual && pkg.monthly && (
+        <p className="mt-1 text-[13px]" style={{ color: "var(--uz-text-muted)" }}>
+          {pick(UI.perMonthNote, lang)} —{" "}
+          <span style={{ color: "var(--uz-text)", fontWeight: 600 }}>
+            {formatPrice(pkg.monthly.priceCents, pkg.monthly.currency, lang)}
+          </span>{" "}
+          / {formatDuration(pkg.monthly.durationDays, lang)}
+        </p>
+      )}
+
+      {lead && (
+        <p className="mt-4 text-sm leading-relaxed" style={{ color: "var(--uz-text-muted)" }}>
+          {lead}
+        </p>
+      )}
+
+      {benefits.length > 0 && (
+        <>
+          <p
+            className="mt-5 text-[11px] font-bold uppercase tracking-wider"
+            style={{ color: "var(--uz-text-faint)" }}
+          >
+            {pick(UI.includes, lang)}
+          </p>
+          <ul className="mt-2 flex-1 space-y-1.5">
+            {benefits.map((benefit) => (
+              <li
+                key={benefit}
+                className="flex gap-2 text-[13px] leading-relaxed"
+                style={{ color: "var(--uz-text)" }}
+              >
+                <span aria-hidden="true" style={{ color: "var(--uz-blue-600)" }}>
+                  &#10003;
+                </span>
+                <span>{benefit}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      <div className="mt-5 flex gap-2">
+        {pkg.annual && (
+          <PayLink
+            type={pkg.annual}
+            label={pick(pkg.monthly ? UI.buyYear : UI.buy, lang)}
+            primary
+          />
+        )}
+        {pkg.monthly && (
+          <PayLink
+            type={pkg.monthly}
+            label={pick(pkg.annual ? UI.buyMonth : UI.buy, lang)}
+            primary={!pkg.annual}
+          />
+        )}
+      </div>
     </div>
   );
 }
 
 function TierGroup({ title, types, lang }: { title: string; types: MembershipType[]; lang: Lang }) {
   if (types.length === 0) return null;
+  const packages = toPackages(types);
   return (
     <div className="mt-10 first:mt-0">
       <h3
@@ -169,9 +301,14 @@ function TierGroup({ title, types, lang }: { title: string; types: MembershipTyp
       >
         {title}
       </h3>
-      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {types.map((type) => (
-          <TierCard key={type.id} type={type} featured={type.slug.endsWith("-medium")} lang={lang} />
+      <div className="grid items-start gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {packages.map((pkg) => (
+          <TierCard
+            key={pkg.base}
+            pkg={pkg}
+            featured={pkg.base.endsWith("-medium")}
+            lang={lang}
+          />
         ))}
       </div>
     </div>

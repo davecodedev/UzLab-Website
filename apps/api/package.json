@@ -20,6 +20,7 @@
     "import:cen": "ts-node --project tsconfig.scripts.json --transpile-only scripts/import-cen-standards.ts",
     "import:depstan": "ts-node --project tsconfig.scripts.json --transpile-only scripts/import-depstan-registry.ts",
     "seed:design-content": "ts-node --project tsconfig.scripts.json --transpile-only scripts/seed-design-content.ts",
+    "seed:membership-pricing": "ts-node --project tsconfig.scripts.json --transpile-only scripts/seed-membership-pricing.ts",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",

@@ -30,6 +30,25 @@ const T = {
   tabCourses: { ru: "Курсы", uz: "Kurslar", en: "Courses" },
   tabPrices: { ru: "Стоимость", uz: "Narxi", en: "Prices" },
 
+  // From the association's price list, not from the provider's. It is the
+  // membership that carries the discount, which is why the figure lives here
+  // and the course prices below stay exactly as the provider quotes them.
+  memberDiscountTitle: {
+    ru: "Членам ассоциации — скидка 20 %",
+    uz: "Assotsiatsiya a'zolariga — 20 % chegirma",
+    en: "Association members get 20% off",
+  },
+  memberDiscountBody: {
+    ru: "Скидка 20 % на местные курсы действует для членов ассоциации от цен, установленных партнёром Triple Point Engineering. Количество слушателей в год зависит от пакета: 10 — «Малые», 15 — «Средние», 20 — «Крупные». Цены ниже указаны без скидки.",
+    uz: "Assotsiatsiya a'zolari uchun mahalliy kurslarga Triple Point Engineering hamkori belgilagan narxlardan 20 % chegirma amal qiladi. Yiliga tinglovchilar soni paketga bog'liq: 10 — «Kichik», 15 — «O'rta», 20 — «Yirik». Quyidagi narxlar chegirmasiz ko'rsatilgan.",
+    en: "Members get 20% off local courses, applied to the prices set by the partner Triple Point Engineering. The number of participants per year depends on the package: 10 for Small, 15 for Medium, 20 for Large. The prices below are before the discount.",
+  },
+  memberDiscountCta: {
+    ru: "Типы членства",
+    uz: "A'zolik turlari",
+    en: "Membership types",
+  },
+
   courseCount: { ru: "курсов в программе", uz: "ta kurs dasturda", en: "courses in the programme" },
   duration: { ru: "Продолжительность", uz: "Davomiyligi", en: "Duration" },
   days: { ru: "дн.", uz: "kun", en: "days" },
@@ -142,10 +161,41 @@ export default function ProfessionalDevelopmentPage() {
         })}
       </div>
 
+      <MemberDiscount />
+
       {tab === "courses" ? <CoursesPanel /> : <PricesPanel />}
 
       <ProviderCard />
     </div>
+  );
+}
+
+/**
+ * The one thing on this page that comes from the association rather than from
+ * the provider. It sits above both tabs because it changes how every figure
+ * below should be read — the prices are the provider's, before the discount.
+ */
+function MemberDiscount() {
+  const { lang } = useLang();
+  return (
+    <section
+      className="mt-6 rounded-xl border p-5"
+      style={{ borderColor: "var(--uz-border)", background: "var(--uz-blue-50)" }}
+    >
+      <p className="text-[15px] font-bold" style={{ color: "var(--uz-navy-900)" }}>
+        {pick(T.memberDiscountTitle, lang)}
+      </p>
+      <p className="mt-1.5 text-[14px] leading-relaxed" style={{ color: "var(--uz-text-muted)" }}>
+        {pick(T.memberDiscountBody, lang)}
+      </p>
+      <Link
+        href="/membership"
+        className="mt-3 inline-block text-[14px] font-semibold"
+        style={{ color: "var(--uz-blue-700)" }}
+      >
+        {pick(T.memberDiscountCta, lang)} &rarr;
+      </Link>
+    </section>
   );
 }
 
