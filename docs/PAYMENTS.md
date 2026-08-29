@@ -21,7 +21,7 @@ editing; it upserts by slug, so existing members keep their type.
 
 | Method        | Grants membership          | Currency | Offered on the site |
 | ------------- | -------------------------- | -------- | ------------------- |
-| Click         | automatically, on Complete | UZS only | yes, when credentials are set (every tier is now UZS) |
+| Click         | automatically, on Complete | UZS only | **live** — credentials set, awaiting first real payment |
 | Payme         | automatically, on Perform  | UZS only | no — code exists, not surfaced |
 | Bank transfer | staff confirm by hand      | any      | no — arranged by e-mail, confirmed in `/admin/payments` |
 
@@ -66,7 +66,17 @@ them into a chat window** — set them in Railway's dashboard, or with
 | `CLICK_SECRET_KEY`  | Секретный ключ     | The MD5 signing key. This is the credential — treat it like a password |
 
 Until all three are present, `gateways().CLICK.available` is `false` and every
-callback is rejected before it touches the database.
+callback is rejected before it touches the database. They are set on the
+Railway `api` service as of 2026-08-17, and `CLICK_MERCHANT_USER_ID` is stored
+alongside them — nothing reads it yet, but it is what Click's Merchant API
+(refunds, status lookups) needs, and it is easier to keep than to ask for
+again.
+
+Verified against production with correctly-signed callbacks: a valid
+signature on an order that does not exist answers `-5`, a tampered signature
+answers `-1`, and a callback carrying someone else's `service_id` answers
+`-1`. That is the proof the key itself is right — the checks in front of it
+would look identical with a wrong key, because both end in `-1`.
 
 ### The protocol as implemented
 
@@ -126,17 +136,16 @@ cabinet.
 ## Outstanding before Click can take money
 
 1. ~~The membership tiers are priced in USD.~~ **Done.** All twelve tiers are
-   in so'm, from the association's own price list — 5 / 7.5 / 10 million a
-   year, or 500 000 / 750 000 / 1 000 000 a month. `createInvoice` will accept
-   any of them the moment Click has credentials.
+   in so'm, from the association's own price list.
+2. ~~Fiscalisation (ИКПУ).~~ **Done, on Click's side.** They configured it
+   against the ИКПУ supplied during contracting, so nothing extra is sent on
+   Complete.
+3. ~~Credentials.~~ **Done.** Set on Railway; signature verification confirmed
+   against production.
 
-2. **Fiscalisation (ИКПУ / фискальный чек).** Uzbek law requires a fiscal
-   receipt for card payments to individuals. Click can issue it if we send the
-   ИКПУ code and package for each membership tier. This is a question for the
-   association's accountant, not a code question — but the answer changes what
-   we send on Complete.
-3. **A static IP,** if Click asks to allowlist ours. Railway does not give one
-   on the current plan.
+What is left is a single real card payment on the cheapest tier, watched
+end to end, then refunded from the Click cabinet. Nothing before that proves
+money actually moves.
 
 ## Bank transfer
 
