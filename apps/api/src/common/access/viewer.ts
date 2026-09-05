@@ -1,4 +1,4 @@
-import { UserRole } from '@prisma/client';
+import { MemberStatus, UserRole } from '@prisma/client';
 import type { AuthenticatedUser } from '../types/authenticated-request.js';
 
 /**
@@ -35,20 +35,32 @@ function isStaff(role: UserRole): boolean {
 }
 
 /**
- * A membership counts while it has not expired. `expiresAt` null means no end
- * date was set, which the membership review flow uses for open-ended entries,
- * so it counts as current rather than as already lapsed.
+ * A membership counts while it has been approved, has not been frozen, and has
+ * not expired. `expiresAt` null means no end date was set, which the review
+ * flow uses for open-ended entries, so it counts as current rather than as
+ * already lapsed.
+ *
+ * Status is checked first and deliberately: a frozen or not-yet-approved
+ * membership may still have months left on it, and the whole point of both
+ * states is that the remaining time does not grant access until someone says
+ * so.
  */
 export function membershipIsActive(
-  member: { expiresAt: Date | null } | null,
+  member: { expiresAt: Date | null; status?: MemberStatus } | null,
 ): boolean {
   if (!member) return false;
+  // `status` is optional so callers that select only `expiresAt` still
+  // compile; absent, it is treated as ACTIVE, which is what the column
+  // defaults to for memberships that predate approval.
+  if ((member.status ?? MemberStatus.ACTIVE) !== MemberStatus.ACTIVE) {
+    return false;
+  }
   return member.expiresAt === null || member.expiresAt.getTime() > Date.now();
 }
 
 export function viewerFor(
   user: AuthenticatedUser | undefined,
-  member: { expiresAt: Date | null } | null,
+  member: { expiresAt: Date | null; status?: MemberStatus } | null,
 ): Viewer {
   if (!user) return ANONYMOUS;
   if (isStaff(user.role) || membershipIsActive(member)) {

@@ -21,6 +21,8 @@ import {
   type StandardsView,
 } from "./storage";
 import { useLang, pick, type Lang } from "@/lib/i18n";
+import { useAccess } from "@/lib/access";
+import { MembersOnlyDialog } from "@/components/MembersOnlyDialog";
 import { formatNumber } from "@/lib/format";
 import {
   EMPTY_QUERY,
@@ -94,6 +96,11 @@ const T = {
   of: { ru: "из", uz: "dan", en: "of" },
   pages: { ru: "с.", uz: "b.", en: "pp." },
   export: { ru: "Экспорт", uz: "Eksport", en: "Export" },
+  membersOnly: {
+    ru: "Поиск и фильтры — для участников UzLab",
+    uz: "Qidiruv va filtrlar — UzLab a'zolari uchun",
+    en: "Search and filters are for UzLab members",
+  },
   viewCards: { ru: "Карточки", uz: "Kartochkalar", en: "Cards" },
   viewTable: { ru: "Таблица", uz: "Jadval", en: "Table" },
   savePrompt: {
@@ -124,6 +131,17 @@ const SELECT_STYLE = {
 
 export function StandardsApp() {
   const { lang } = useLang();
+  const { access, isMember } = useAccess();
+  // Null until the entitlement lookup answers. Treated as "allowed" for that
+  // moment so a member does not see the gate flash on every page load — the
+  // API refuses a non-member's search regardless, so the worst case is a
+  // dialog a fraction of a second late rather than data getting out.
+  const gated = access !== null && !isMember;
+  const [gateOpen, setGateOpen] = useState(false);
+
+  /** Runs the action, or explains why it will not. */
+  const guard = (run: () => void) => () => (gated ? setGateOpen(true) : run());
+
   const [query, setQuery] = useState<StandardsQuery>(EMPTY_QUERY);
   const [text, setText] = useState("");
   const [result, setResult] = useState<StandardsPage | null>(null);
@@ -283,6 +301,7 @@ export function StandardsApp() {
   const totalPages = result ? Math.max(1, Math.ceil(result.total / result.pageSize)) : 1;
 
   return (
+    <>
     <section className="mx-auto max-w-[1440px] px-6 py-10 md:px-8">
       <h1
         className="text-3xl font-extrabold md:text-4xl"
@@ -295,7 +314,33 @@ export function StandardsApp() {
       </p>
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[300px_1fr]">
-        <aside className="space-y-5">
+        <aside className="relative space-y-5">
+          {/* One overlay rather than a `disabled` on each control: a disabled
+              select cannot be clicked, so there would be nothing to hang the
+              explanation off — the sidebar would simply look broken. This way
+              the filters stay visible and legible, and touching any of them
+              says why they are closed. */}
+          {gated && (
+            <>
+              <div
+                role="button"
+                tabIndex={0}
+                aria-label={pick(T.membersOnly, lang)}
+                onClick={() => setGateOpen(true)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") setGateOpen(true);
+                }}
+                className="absolute inset-0 z-10 cursor-pointer rounded-xl"
+              />
+              <p
+                className="rounded-lg px-3 py-2 text-[12.5px] font-semibold"
+                style={{ background: "var(--uz-amber-100)", color: "var(--uz-text)" }}
+              >
+                {pick(T.membersOnly, lang)}
+              </p>
+            </>
+          )}
+          <div className={gated ? "space-y-5 select-none opacity-55" : "space-y-5"}>
           <div>
             <label
               className="mb-1.5 block text-xs font-semibold uppercase tracking-wider"
@@ -305,13 +350,23 @@ export function StandardsApp() {
             </label>
             <input
               value={text}
-              onChange={(e) => setText(e.target.value)}
+              readOnly={gated}
+              onChange={(e) => {
+                if (gated) return;
+                setText(e.target.value);
+              }}
+              // `readOnly` rather than `disabled`: a disabled input cannot be
+              // focused or clicked, so there would be nothing to hang the
+              // explanation off — the field would just look broken.
+              onMouseDown={() => gated && setGateOpen(true)}
+              onFocus={() => gated && setGateOpen(true)}
               onKeyDown={(e) => {
+                if (gated) return;
                 if (e.key === "Enter") remember({ ...query, q: text });
               }}
               placeholder={pick(T.search, lang)}
               className={SELECT_CLASS}
-              style={SELECT_STYLE}
+              style={{ ...SELECT_STYLE, cursor: gated ? "pointer" : undefined }}
             />
           </div>
 
@@ -435,6 +490,7 @@ export function StandardsApp() {
               {pick(T.reset, lang)}
             </button>
           )}
+          </div>
         </aside>
 
         <div>
@@ -465,20 +521,22 @@ export function StandardsApp() {
                 </button>
               ))}
             </div>
+            {/* Left enabled and clickable when gated, so the click has
+                somewhere to land and can explain itself. */}
             <ExportButton
               label={pick(T.exportCsv, lang)}
-              disabled={exporting || !result?.total}
-              onClick={() => void runExport(exportStandardsCsv)}
+              disabled={!gated && (exporting || !result?.total)}
+              onClick={guard(() => void runExport(exportStandardsCsv))}
             />
             <ExportButton
               label={pick(T.exportXlsx, lang)}
-              disabled={exporting || !result?.total}
-              onClick={() => void runExport(exportStandardsXlsx)}
+              disabled={!gated && (exporting || !result?.total)}
+              onClick={guard(() => void runExport(exportStandardsXlsx))}
             />
             <ExportButton
               label={pick(T.exportPrint, lang)}
-              disabled={!result?.total}
-              onClick={() => printStandards()}
+              disabled={!gated && !result?.total}
+              onClick={guard(() => printStandards())}
             />
           </div>
 
@@ -554,7 +612,12 @@ export function StandardsApp() {
           )}
         </div>
       </div>
-    </section>
+      </section>
+
+      {gateOpen && (
+        <MembersOnlyDialog access={access} onClose={() => setGateOpen(false)} />
+      )}
+    </>
   );
 }
 

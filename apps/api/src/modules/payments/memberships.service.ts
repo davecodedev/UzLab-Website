@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { MemberStatus } from '@prisma/client';
 import type { Payment, Prisma } from '@prisma/client';
 
 /**
@@ -23,6 +24,12 @@ export class MembershipsService {
    * Extends from the current expiry when the membership is still running, and
    * from today when it has lapsed — renewing early should not cost the payer
    * the time they had left, and renewing late should not silently backdate.
+   *
+   * A first payment creates the membership as PENDING_APPROVAL: money buys the
+   * time, an administrator admits the member. A renewal by someone already
+   * admitted keeps whatever status they have, so paying again does not send an
+   * existing member back into the queue — and paying while frozen does not
+   * quietly unfreeze them either. Both of those are decisions for a person.
    */
   async grant(tx: Prisma.TransactionClient, payment: Payment): Promise<void> {
     const now = new Date();
@@ -49,19 +56,24 @@ export class MembershipsService {
           userId: payment.userId,
           membershipTypeId: payment.membershipTypeId,
           expiresAt,
+          status: MemberStatus.PENDING_APPROVAL,
         },
       });
     }
 
     // A paying member is a member: without this their role would still say
-    // APPLICANT and parts of the site keyed on role would not open up.
+    // APPLICANT and parts of the site keyed on role would not open up. The
+    // role is not what grants access — `membershipIsActive` decides that — so
+    // setting it before approval is safe and keeps the account area coherent.
     await tx.user.updateMany({
       where: { id: payment.userId, role: 'APPLICANT' },
       data: { role: 'MEMBER' },
     });
 
     this.logger.log(
-      `membership for ${payment.userId} now runs to ${expiresAt.toISOString()}`,
+      existing
+        ? `membership for ${payment.userId} extended to ${expiresAt.toISOString()}`
+        : `membership for ${payment.userId} created pending approval, paid to ${expiresAt.toISOString()}`,
     );
   }
 

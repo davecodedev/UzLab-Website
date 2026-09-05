@@ -25,6 +25,7 @@ const NAV_GROUPS: { heading: string; links: { href: string; label: string; hint?
       { href: "/admin/laboratory-submissions", label: "Lab submissions" },
       { href: "/admin/contact", label: "Contact & feedback" },
       { href: "/admin/payments", label: "Bank transfers", hint: "Confirm invoices paid by transfer" },
+      { href: "/admin/members", label: "Members", hint: "Approve, freeze or remove memberships" },
     ],
   },
   {

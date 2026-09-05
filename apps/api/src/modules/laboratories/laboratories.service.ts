@@ -47,7 +47,9 @@ export class LaboratoriesService {
     if (!user) return ANONYMOUS;
     const member = await this.prisma.member.findUnique({
       where: { userId: user.id },
-      select: { expiresAt: true },
+      // `status` matters as much as the date: a frozen membership can have
+      // months left on it and must still not open the full record.
+      select: { expiresAt: true, status: true },
     });
     return viewerFor(user, member);
   }

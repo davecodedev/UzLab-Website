@@ -3,7 +3,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { MembershipApplicationStatus, UserRole } from '@prisma/client';
+import {
+  MembershipApplicationStatus,
+  MemberStatus,
+  UserRole,
+} from '@prisma/client';
+import { AccessTier, viewerFor } from '../../common/access/viewer.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
 import { slugify } from '../../common/utils/slugify.js';
 import { CreateApplicationDto } from './dto/create-application.dto.js';
@@ -80,7 +85,10 @@ export class MembershipService {
    */
   listDirectory() {
     return this.prisma.member.findMany({
-      where: { isDirectoryListed: true },
+      // Frozen and not-yet-approved memberships stay out of the public
+      // directory: it is a list of current members, not of everyone who ever
+      // paid.
+      where: { isDirectoryListed: true, status: MemberStatus.ACTIVE },
       select: {
         id: true,
         organization: true,
@@ -205,4 +213,119 @@ export class MembershipService {
       throw new ConflictException(`Slug "${slug}" is already in use`);
     }
   }
+
+  // --- Members, for the admin panel ---------------------------------------
+
+  /**
+   * Every membership, newest first, with enough on each row for an
+   * administrator to decide: who, which package, what it costs, when it runs
+   * out, and whether the last payment actually arrived.
+   */
+  listMembers() {
+    return this.prisma.member.findMany({
+      orderBy: [{ status: 'asc' }, { memberSince: 'desc' }],
+      select: {
+        id: true,
+        status: true,
+        organization: true,
+        memberSince: true,
+        expiresAt: true,
+        statusNote: true,
+        reviewedAt: true,
+        isDirectoryListed: true,
+        user: {
+          select: { id: true, email: true, fullName: true, role: true },
+        },
+        membershipType: { select: { name: true, durationDays: true } },
+      },
+    });
+  }
+
+  /**
+   * Approve, freeze or unfreeze.
+   *
+   * None of the three touches `expiresAt`. Freezing someone who has paid to
+   * March must leave March intact, or unfreezing them would silently cost them
+   * the time they bought — the suspension is of access, not of the money.
+   */
+  async setMemberStatus(
+    memberId: string,
+    staffUserId: string,
+    action: 'approve' | 'freeze' | 'unfreeze',
+    note?: string,
+  ) {
+    const member = await this.prisma.member.findUnique({
+      where: { id: memberId },
+    });
+    if (!member) throw new NotFoundException('Member not found');
+
+    if (action === 'freeze' && member.status === MemberStatus.FROZEN) {
+      throw new ConflictException('This membership is already frozen.');
+    }
+    if (action !== 'freeze' && member.status === MemberStatus.ACTIVE) {
+      throw new ConflictException('This membership is already active.');
+    }
+
+    return this.prisma.member.update({
+      where: { id: memberId },
+      data: {
+        status:
+          action === 'freeze' ? MemberStatus.FROZEN : MemberStatus.ACTIVE,
+        reviewedByUserId: staffUserId,
+        reviewedAt: new Date(),
+        statusNote: note ?? null,
+      },
+    });
+  }
+
+  /**
+   * Removing a member who is no longer with the association.
+   *
+   * The membership row goes; the user account is soft-deleted rather than
+   * erased, because payments, applications and laboratory claims point at it
+   * and a hard delete would either fail on those references or take real
+   * financial history with it. `deletedAt` is what the rest of the API already
+   * filters on.
+   */
+  async removeMember(memberId: string, staffUserId: string, note?: string) {
+    const member = await this.prisma.member.findUnique({
+      where: { id: memberId },
+      select: { id: true, userId: true },
+    });
+    if (!member) throw new NotFoundException('Member not found');
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.member.delete({ where: { id: member.id } });
+      await tx.user.update({
+        where: { id: member.userId },
+        data: { deletedAt: new Date(), role: UserRole.APPLICANT },
+      });
+      // Their refresh tokens go too, so an open session cannot keep working
+      // after the account has been removed.
+      await tx.refreshToken.deleteMany({ where: { userId: member.userId } });
+      return { removed: true, userId: member.userId, note: note ?? null };
+    });
+  }
+
+  /**
+   * What the caller is entitled to, for the browser to render with.
+   *
+   * The tier is decided here and only mirrored in the UI — every endpoint that
+   * returns restricted data re-derives it server-side, so a client that lies
+   * about its tier gains nothing but a differently-drawn button.
+   */
+  async access(user?: { id: string; role: UserRole }) {
+    if (!user) return { tier: AccessTier.PUBLIC, status: null, expiresAt: null };
+    const member = await this.prisma.member.findUnique({
+      where: { userId: user.id },
+      select: { expiresAt: true, status: true },
+    });
+    const viewer = viewerFor(user as never, member);
+    return {
+      tier: viewer.tier,
+      status: member?.status ?? null,
+      expiresAt: member?.expiresAt ?? null,
+    };
+  }
+
 }

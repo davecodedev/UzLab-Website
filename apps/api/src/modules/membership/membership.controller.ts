@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -12,6 +13,12 @@ import { CreateApplicationDto } from './dto/create-application.dto.js';
 import { CreateMembershipTypeDto } from './dto/create-membership-type.dto.js';
 import { UpdateMembershipTypeDto } from './dto/update-membership-type.dto.js';
 import { ReviewApplicationDto } from './dto/review-application.dto.js';
+import {
+  RemoveMemberDto,
+  UpdateMemberStatusDto,
+} from './dto/member-status.dto.js';
+import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard.js';
+import type { AuthenticatedUser } from '../../common/types/authenticated-request.js';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../../common/guards/roles.guard.js';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
@@ -85,4 +92,54 @@ export class MembershipController {
   ) {
     return this.membershipService.reviewApplication(id, user.id, dto);
   }
+
+  /**
+   * What the caller may do, for the browser to draw with. Answers for
+   * anonymous callers too, which is why the guard is the optional one.
+   */
+  @UseGuards(OptionalJwtAuthGuard)
+  @Get('access')
+  access(@CurrentUser() user?: AuthenticatedUser) {
+    return this.membershipService.access(user);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.STAFF)
+  @Get('members')
+  listMembers() {
+    return this.membershipService.listMembers();
+  }
+
+  /** Approve a paid membership, or freeze / unfreeze an existing one. */
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.STAFF)
+  @Patch('members/:id/status')
+  setMemberStatus(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+    @Body() dto: UpdateMemberStatusDto,
+  ) {
+    return this.membershipService.setMemberStatus(
+      id,
+      user.id,
+      dto.action,
+      dto.note,
+    );
+  }
+
+  /**
+   * Remove a member. Admins only — freezing is reversible and staff may do it,
+   * removal is not and they may not.
+   */
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @Delete('members/:id')
+  removeMember(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+    @Body() dto: RemoveMemberDto,
+  ) {
+    return this.membershipService.removeMember(id, user.id, dto.note);
+  }
+
 }

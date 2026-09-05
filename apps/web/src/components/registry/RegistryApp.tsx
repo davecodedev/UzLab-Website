@@ -27,6 +27,8 @@ import {
 } from "./registry-data";
 import { exportCsv, exportXlsx, printPdf } from "./export-utils";
 import { RestrictedNotice } from "./RestrictedNotice";
+import { useAccess } from "@/lib/access";
+import { MembersOnlyDialog } from "@/components/MembersOnlyDialog";
 import { Pager, pageSlice } from "@/components/Pager";
 import {
   clearRecentSearches,
@@ -266,6 +268,14 @@ export function RegistryApp({ laboratories }: { laboratories: Laboratory[] }) {
 
   const [filters, setFilters] = useState<RegistryFilters>(EMPTY_FILTERS);
   const [view, setView] = useState<"table" | "cards" | "map" | "chart">("table");
+
+  // The table is the free view of the registry. The other three presentations
+  // and every export are what a membership buys — `access === null` means the
+  // lookup has not answered yet, and is treated as allowed so a member does
+  // not see the gate flash on load.
+  const { access, isMember } = useAccess();
+  const gated = access !== null && !isMember;
+  const [gateOpen, setGateOpen] = useState(false);
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
   const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([]);
   const [exportOpen, setExportOpen] = useState(false);
@@ -509,6 +519,7 @@ export function RegistryApp({ laboratories }: { laboratories: Laboratory[] }) {
   const sortedRegionRows = useMemo(() => [...regionRows].sort((a, b) => b.count - a.count), [regionRows]);
 
   return (
+    <>
     <div className="reg-root mx-auto max-w-[1440px] px-6 py-10 md:px-8" style={REG_VARS}>
       <style>{`
         .reg-root { font-family: var(--reg-font-sans); color: var(--reg-ink); }
@@ -543,7 +554,13 @@ export function RegistryApp({ laboratories }: { laboratories: Laboratory[] }) {
 
       <div className="mt-8 flex flex-col gap-6 lg:flex-row lg:items-start">
         {/* Sidebar ------------------------------------------------------- */}
-        <div className="reg-print-hide w-full flex-none space-y-4 lg:sticky lg:top-6 lg:w-[300px]">
+        {/* The filter list is longer than a laptop viewport, and being sticky
+            without a height of its own meant its bottom half could only be
+            reached by scrolling the results column past it. It now scrolls
+            inside itself, capped to the window, so every filter is reachable
+            from the moment the page opens. `overscroll-contain` stops that
+            scroll from continuing into the page once it hits the end. */}
+        <div className="reg-print-hide w-full flex-none space-y-4 lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto lg:overscroll-contain lg:pr-1.5 lg:w-[308px]">
           <FiltersCard
             lang={lang}
             filters={filters}
@@ -593,7 +610,9 @@ export function RegistryApp({ laboratories }: { laboratories: Laboratory[] }) {
                     key={v}
                     type="button"
                     className="reg-btn px-3 py-1.5 text-xs font-semibold transition-colors"
-                    onClick={() => setView(v)}
+                    onClick={() =>
+                      v !== "table" && gated ? setGateOpen(true) : setView(v)
+                    }
                     style={
                       view === v
                         ? { background: "var(--reg-ink)", color: "#fff" }
@@ -620,13 +639,13 @@ export function RegistryApp({ laboratories }: { laboratories: Laboratory[] }) {
                     className="reg-export-menu absolute right-0 z-20 mt-2 w-56 overflow-hidden rounded-[11px] bg-white"
                     style={{ border: "1px solid var(--reg-border)" }}
                   >
-                    <button type="button" onClick={handleExportCsv} className="reg-btn block w-full px-4 py-2.5 text-left text-sm hover:bg-[var(--reg-hover)]">
+                    <button type="button" onClick={() => (gated ? setGateOpen(true) : handleExportCsv())} className="reg-btn block w-full px-4 py-2.5 text-left text-sm hover:bg-[var(--reg-hover)]">
                       {t("exportCsv", lang)}
                     </button>
-                    <button type="button" onClick={handleExportXlsx} className="reg-btn block w-full px-4 py-2.5 text-left text-sm hover:bg-[var(--reg-hover)]" style={{ borderTop: "1px solid var(--reg-divider)" }}>
+                    <button type="button" onClick={() => (gated ? setGateOpen(true) : handleExportXlsx())} className="reg-btn block w-full px-4 py-2.5 text-left text-sm hover:bg-[var(--reg-hover)]" style={{ borderTop: "1px solid var(--reg-divider)" }}>
                       {t("exportXlsx", lang)}
                     </button>
-                    <button type="button" onClick={handleExportPdf} className="reg-btn block w-full px-4 py-2.5 text-left text-sm hover:bg-[var(--reg-hover)]" style={{ borderTop: "1px solid var(--reg-divider)" }}>
+                    <button type="button" onClick={() => (gated ? setGateOpen(true) : handleExportPdf())} className="reg-btn block w-full px-4 py-2.5 text-left text-sm hover:bg-[var(--reg-hover)]" style={{ borderTop: "1px solid var(--reg-divider)" }}>
                       {t("exportPdf", lang)}
                     </button>
                   </div>
@@ -671,7 +690,12 @@ export function RegistryApp({ laboratories }: { laboratories: Laboratory[] }) {
           {toast}
         </div>
       )}
-    </div>
+      </div>
+
+      {gateOpen && (
+        <MembersOnlyDialog access={access} onClose={() => setGateOpen(false)} />
+      )}
+    </>
   );
 }
 
@@ -702,8 +726,8 @@ function FiltersCard({
 }) {
   const active = hasActiveFilters(filters);
   return (
-    <div className="rounded-[14px] bg-white p-5" style={{ border: "1px solid var(--reg-border)" }}>
-      <div className="mb-4 flex items-center justify-between">
+    <div className="rounded-[14px] bg-white p-4" style={{ border: "1px solid var(--reg-border)" }}>
+      <div className="mb-3 flex items-center justify-between">
         <h2 className="text-sm font-bold" style={{ color: "var(--reg-ink)" }}>
           {t("filters", lang)}
         </h2>
@@ -714,7 +738,7 @@ function FiltersCard({
         )}
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         <div>
           <label className={labelClass()} style={{ color: "var(--reg-gray-2)" }}>
             {t("regNo", lang)}

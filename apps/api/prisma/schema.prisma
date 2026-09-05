@@ -100,6 +100,19 @@ model MembershipApplication {
   @@index([status])
 }
 
+/// Where a membership stands, independently of whether it has expired.
+///
+/// Paying does not by itself open the member area: a payment creates the
+/// membership as PENDING_APPROVAL and an administrator admits it. FROZEN is
+/// for a member who has stopped paying or is late — it suspends access without
+/// destroying the record or the time already bought, so unfreezing restores
+/// exactly what was there.
+enum MemberStatus {
+  PENDING_APPROVAL
+  ACTIVE
+  FROZEN
+}
+
 model Member {
   id                String         @id @default(uuid())
   userId            String         @unique
@@ -110,10 +123,23 @@ model Member {
   isDirectoryListed Boolean        @default(true)
   memberSince       DateTime       @default(now())
   expiresAt         DateTime?
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+
+  /// Defaults to ACTIVE so memberships that predate the approval step keep
+  /// working; only new paid ones are created PENDING_APPROVAL.
+  status MemberStatus @default(ACTIVE)
+
+  /// Who admitted, froze or unfroze this membership, and why. Recorded rather
+  /// than inferred: suspending someone's paid access is a human decision and
+  /// should be attributable.
+  reviewedByUserId String?
+  reviewedAt       DateTime?
+  statusNote       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([isDirectoryListed])
+  @@index([status])
 }
 
 // --- Laboratory Registry --------------------------------------------------
