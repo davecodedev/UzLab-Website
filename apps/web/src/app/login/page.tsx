@@ -23,6 +23,15 @@ const T = {
   submit: { ru: "Войти", uz: "Kirish", en: "Log in" },
   noAcc: { ru: "Нет аккаунта?", uz: "Akkaunt yo'qmi?", en: "No account?" },
   createOne: { ru: "Зарегистрироваться", uz: "Ro'yxatdan o'tish", en: "Sign up" },
+
+  tabPassword: { ru: "E-mail и пароль", uz: "E-mail va parol", en: "E-mail and password" },
+  tabKey: { ru: "Ключ доступа", uz: "Kirish kaliti", en: "Access key" },
+  accessKey: { ru: "Ключ доступа организации", uz: "Tashkilot kirish kaliti", en: "Organisation access key" },
+  accessKeyHint: {
+    ru: "Ключ выдаётся после подтверждения членства. Одновременно им можно пользоваться только на одном устройстве.",
+    uz: "Kalit a'zolik tasdiqlangandan so'ng beriladi. Undan bir vaqtning o'zida faqat bitta qurilmada foydalanish mumkin.",
+    en: "The key is issued once membership is approved. It can be used on one device at a time.",
+  },
 } as const;
 
 export default function LoginPage() {
@@ -37,15 +46,20 @@ function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   const { lang } = useLang();
+  const [mode, setMode] = useState<"password" | "key">("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [accessKey, setAccessKey] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     try {
-      const result = await api.post<AuthResponse>("/auth/login", { email, password });
+      const result =
+        mode === "key"
+          ? await api.post<AuthResponse>("/auth/login-key", { accessKey })
+          : await api.post<AuthResponse>("/auth/login", { email, password });
       storeSession(result.accessToken, result.refreshToken, result.user);
 
       // Staff land in the admin panel rather than on the marketing page: it is
@@ -61,23 +75,69 @@ function LoginForm() {
   return (
     <AuthShell mode="login">
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <AuthInput
-          label={pick(T.email, lang)}
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          placeholder={pick(T.emailPlaceholder, lang)}
-        />
-        <AuthInput
-          label={pick(T.password, lang)}
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          placeholder="••••••••"
-        />
-        <div className="flex items-center justify-between">
+        {/* Two ways in, not two forms: a laboratory that was given a key
+            should not have to work out that the e-mail box is not for them. */}
+        <div
+          className="flex overflow-hidden rounded-lg"
+          style={{ border: "1px solid var(--uz-border)" }}
+        >
+          {(["password", "key"] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => {
+                setMode(m);
+                setError(null);
+              }}
+              className="flex-1 px-3 py-2 text-[13px] font-semibold"
+              style={
+                mode === m
+                  ? { background: "var(--uz-navy-900)", color: "#fff" }
+                  : { background: "#fff", color: "var(--uz-text-muted)" }
+              }
+            >
+              {pick(m === "password" ? T.tabPassword : T.tabKey, lang)}
+            </button>
+          ))}
+        </div>
+
+        {mode === "key" ? (
+          <>
+            <AuthInput
+              label={pick(T.accessKey, lang)}
+              type="text"
+              value={accessKey}
+              onChange={(e) => setAccessKey(e.target.value.toUpperCase())}
+              required
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="UZLAB-XXXX-XXXX-XXXX"
+            />
+            <p className="text-[12.5px] leading-relaxed" style={{ color: "var(--uz-text-muted)" }}>
+              {pick(T.accessKeyHint, lang)}
+            </p>
+          </>
+        ) : (
+          <>
+            <AuthInput
+              label={pick(T.email, lang)}
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              placeholder={pick(T.emailPlaceholder, lang)}
+            />
+            <AuthInput
+              label={pick(T.password, lang)}
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              placeholder="••••••••"
+            />
+          </>
+        )}
+        <div className="flex items-center justify-between" hidden={mode === "key"}>
           <label
             className="flex items-center gap-2 text-[13.5px]"
             style={{ color: "var(--uz-text-muted)" }}

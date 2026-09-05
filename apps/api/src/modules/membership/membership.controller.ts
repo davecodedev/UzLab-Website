@@ -127,6 +127,17 @@ export class MembershipController {
     );
   }
 
+  /** A replacement key. Invalidates the old one and ends the member's session. */
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.STAFF)
+  @Post('members/:id/access-key')
+  reissueAccessKey(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+  ) {
+    return this.membershipService.reissueAccessKey(id, user.id);
+  }
+
   /**
    * Remove a member. Admins only — freezing is reversible and staff may do it,
    * removal is not and they may not.
@@ -141,5 +152,4 @@ export class MembershipController {
   ) {
     return this.membershipService.removeMember(id, user.id, dto.note);
   }
-
 }

@@ -9,6 +9,7 @@ import {
   UserRole,
 } from '@prisma/client';
 import { AccessTier, viewerFor } from '../../common/access/viewer.js';
+import { AuthService } from '../auth/auth.service.js';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
 import { slugify } from '../../common/utils/slugify.js';
 import { CreateApplicationDto } from './dto/create-application.dto.js';
@@ -233,6 +234,8 @@ export class MembershipService {
         statusNote: true,
         reviewedAt: true,
         isDirectoryListed: true,
+        accessKeyHint: true,
+        accessKeyIssuedAt: true,
         user: {
           select: { id: true, email: true, fullName: true, role: true },
         },
@@ -266,16 +269,78 @@ export class MembershipService {
       throw new ConflictException('This membership is already active.');
     }
 
-    return this.prisma.member.update({
+    // Approving is when the organisation gets its access key — that is the
+    // automation the whole flow is for. It is issued once and only once:
+    // re-approving somebody who already has one must not silently invalidate
+    // the key they are using.
+    const issueKey = action === 'approve' && !member.accessKeyHash;
+    const accessKey = issueKey ? AuthService.generateAccessKey() : null;
+
+    const updated = await this.prisma.member.update({
       where: { id: memberId },
       data: {
-        status:
-          action === 'freeze' ? MemberStatus.FROZEN : MemberStatus.ACTIVE,
+        status: action === 'freeze' ? MemberStatus.FROZEN : MemberStatus.ACTIVE,
         reviewedByUserId: staffUserId,
         reviewedAt: new Date(),
         statusNote: note ?? null,
+        ...(accessKey
+          ? {
+              accessKeyHash: AuthService.hashAccessKey(accessKey),
+              accessKeyHint: accessKey.slice(-4),
+              accessKeyIssuedAt: new Date(),
+            }
+          : {}),
       },
     });
+
+    // The plaintext is returned here and nowhere else. Only the hash is
+    // stored, so this response is the one chance to pass it on — the admin
+    // page shows it once and says so.
+    return { ...updated, accessKey };
+  }
+
+  /**
+   * Issues a replacement key, invalidating the old one immediately.
+   *
+   * For a key that has been shared too widely or lost. It also ends the
+   * member's current session, because whoever is holding the old key should
+   * stop being signed in the moment it stops being valid.
+   */
+  async reissueAccessKey(memberId: string, staffUserId: string) {
+    const member = await this.prisma.member.findUnique({
+      where: { id: memberId },
+      select: { id: true, userId: true, status: true },
+    });
+    if (!member) throw new NotFoundException('Member not found');
+    if (member.status !== MemberStatus.ACTIVE) {
+      throw new ConflictException(
+        'Only an active membership can hold an access key.',
+      );
+    }
+
+    const accessKey = AuthService.generateAccessKey();
+    await this.prisma.$transaction(async (tx) => {
+      await tx.member.update({
+        where: { id: member.id },
+        data: {
+          accessKeyHash: AuthService.hashAccessKey(accessKey),
+          accessKeyHint: accessKey.slice(-4),
+          accessKeyIssuedAt: new Date(),
+          reviewedByUserId: staffUserId,
+          reviewedAt: new Date(),
+        },
+      });
+      await tx.user.update({
+        where: { id: member.userId },
+        data: { activeSessionId: null, activeSessionAt: null },
+      });
+      await tx.refreshToken.updateMany({
+        where: { userId: member.userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+    });
+
+    return { accessKey };
   }
 
   /**
@@ -315,17 +380,24 @@ export class MembershipService {
    * about its tier gains nothing but a differently-drawn button.
    */
   async access(user?: { id: string; role: UserRole }) {
-    if (!user) return { tier: AccessTier.PUBLIC, status: null, expiresAt: null };
+    if (!user)
+      return { tier: AccessTier.PUBLIC, status: null, expiresAt: null };
     const member = await this.prisma.member.findUnique({
       where: { userId: user.id },
-      select: { expiresAt: true, status: true },
+      select: {
+        expiresAt: true,
+        status: true,
+        accessKeyHint: true,
+        accessKeyIssuedAt: true,
+      },
     });
     const viewer = viewerFor(user as never, member);
     return {
       tier: viewer.tier,
       status: member?.status ?? null,
       expiresAt: member?.expiresAt ?? null,
+      accessKeyHint: member?.accessKeyHint ?? null,
+      accessKeyIssuedAt: member?.accessKeyIssuedAt ?? null,
     };
   }
-
 }

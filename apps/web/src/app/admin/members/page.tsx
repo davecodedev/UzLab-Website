@@ -31,6 +31,8 @@ interface AdminMember {
   expiresAt: string | null;
   statusNote: string | null;
   reviewedAt: string | null;
+  accessKeyHint: string | null;
+  accessKeyIssuedAt: string | null;
   user: { id: string; email: string; fullName: string; role: string };
   membershipType: { name: string; durationDays: number };
 }
@@ -52,6 +54,9 @@ export default function AdminMembersPage() {
   // render differs between the server pass and the client one, and React
   // flags it for exactly that reason.
   const [now, setNow] = useState(0);
+  // The plaintext key exists in exactly one response and is never stored, so
+  // it is held here until the administrator has copied it.
+  const [issuedKey, setIssuedKey] = useState<{ name: string; key: string } | null>(null);
 
   const load = useCallback(() => {
     const token = getAccessToken();
@@ -83,10 +88,39 @@ export default function AdminMembersPage() {
     setBusyId(m.id);
     setError(null);
     try {
-      await api.patch(`/membership/members/${m.id}/status`, { action, note }, getAccessToken() ?? undefined);
+      const res = await api.patch<{ accessKey: string | null }>(
+        `/membership/members/${m.id}/status`,
+        { action, note },
+        getAccessToken() ?? undefined,
+      );
+      if (res.accessKey) setIssuedKey({ name: m.user.fullName, key: res.accessKey });
       load();
     } catch (e) {
       setError(e instanceof ApiError && e.message ? e.message : "Action failed.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function reissue(m: AdminMember) {
+    if (
+      !window.confirm(
+        `Issue a new access key for ${m.user.fullName}? The current key stops working immediately and they are signed out.`,
+      )
+    )
+      return;
+    setBusyId(m.id);
+    setError(null);
+    try {
+      const res = await api.post<{ accessKey: string }>(
+        `/membership/members/${m.id}/access-key`,
+        {},
+        getAccessToken() ?? undefined,
+      );
+      setIssuedKey({ name: m.user.fullName, key: res.accessKey });
+      load();
+    } catch (e) {
+      setError(e instanceof ApiError && e.message ? e.message : "Could not issue a key.");
     } finally {
       setBusyId(null);
     }
@@ -131,6 +165,37 @@ export default function AdminMembersPage() {
 
       {error && <p className="mt-4 text-sm text-red-700">{error}</p>}
 
+      {issuedKey && (
+        <div className="mt-5 rounded-lg border border-amber-300 bg-amber-50 p-4">
+          <p className="text-sm font-bold text-amber-900">
+            Access key for {issuedKey.name} — shown once
+          </p>
+          <p className="mt-1 text-xs text-amber-900/80">
+            Only a hash of it is stored, so this is the only time it can be read. Copy it and send
+            it to the member; if it is lost, issue a new one.
+          </p>
+          <p className="mt-3 select-all rounded-md bg-white px-3 py-2 font-mono text-lg font-bold tracking-wider">
+            {issuedKey.key}
+          </p>
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={() => void navigator.clipboard?.writeText(issuedKey.key)}
+              className="rounded-md bg-black px-3 py-1.5 text-xs font-semibold text-white"
+            >
+              Copy
+            </button>
+            <button
+              type="button"
+              onClick={() => setIssuedKey(null)}
+              className="rounded-md border border-black/20 px-3 py-1.5 text-xs font-semibold"
+            >
+              I have copied it
+            </button>
+          </div>
+        </div>
+      )}
+
       <Section title={`Awaiting approval (${pending.length})`}>
         {pending.length === 0 ? (
           <Empty>Nobody waiting.</Empty>
@@ -163,6 +228,7 @@ export default function AdminMembersPage() {
               isAdmin={isAdmin}
               now={now}
               onFreeze={() => act(m, "freeze")}
+              onReissue={() => reissue(m)}
               onRemove={() => remove(m)}
             />
           ))
@@ -200,6 +266,7 @@ function Row({
   onApprove,
   onFreeze,
   onUnfreeze,
+  onReissue,
   onRemove,
 }: {
   member: AdminMember;
@@ -211,6 +278,7 @@ function Row({
   onApprove?: () => void;
   onFreeze?: () => void;
   onUnfreeze?: () => void;
+  onReissue?: () => void;
   onRemove?: () => void;
 }) {
   const style = STATUS_STYLE[member.status];
@@ -243,6 +311,13 @@ function Row({
           Member since {formatDateNumeric(member.memberSince, lang)}
           {member.expiresAt && ` · paid to ${formatDateNumeric(member.expiresAt, lang)}`}
         </p>
+        {member.accessKeyHint && (
+          <p className="mt-0.5 font-mono text-xs text-black/50">
+            Key ····{member.accessKeyHint}
+            {member.accessKeyIssuedAt &&
+              ` · issued ${formatDateNumeric(member.accessKeyIssuedAt, lang)}`}
+          </p>
+        )}
         {member.statusNote && (
           <p className="mt-1 text-xs text-black/60">Note: {member.statusNote}</p>
         )}
@@ -277,6 +352,16 @@ function Row({
             className="rounded-md bg-black px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40"
           >
             Unfreeze
+          </button>
+        )}
+        {onReissue && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onReissue}
+            className="rounded-md border border-black/20 px-3 py-1.5 text-xs font-semibold disabled:opacity-40"
+          >
+            {member.accessKeyHint ? "New key" : "Issue key"}
           </button>
         )}
         {/* Admin-only: freezing is reversible, removal is not. */}

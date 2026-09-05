@@ -21,15 +21,30 @@ enum UserRole {
 }
 
 model User {
-  id            String    @id @default(uuid())
-  email         String    @unique
+  id            String   @id @default(uuid())
+  email         String   @unique
   passwordHash  String
   fullName      String
-  role          UserRole  @default(APPLICANT)
-  emailVerified Boolean   @default(false)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  deletedAt     DateTime?
+  role          UserRole @default(APPLICANT)
+  emailVerified Boolean  @default(false)
+
+  /// The one session this account may have at a time. Every access token
+  /// carries the id it was minted under, and the JWT strategy refuses a token
+  /// whose id no longer matches — so signing in somewhere else ends the
+  /// previous session on the next request rather than fifteen minutes later
+  /// when its token happens to expire.
+  ///
+  /// Null means no session has been opened since this was introduced, and is
+  /// treated as "not tracked" rather than "signed out", so deploying it does
+  /// not sign everyone out at once.
+  activeSessionId    String?
+  activeSessionAt    DateTime?
+  /// A human label for the device, from the user agent — shown when a session
+  /// is displaced so the person can tell whether it was them.
+  activeSessionLabel String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  deletedAt          DateTime?
 
   refreshTokens          RefreshToken[]
   member                 Member?
@@ -127,6 +142,19 @@ model Member {
   /// Defaults to ACTIVE so memberships that predate the approval step keep
   /// working; only new paid ones are created PENDING_APPROVAL.
   status MemberStatus @default(ACTIVE)
+
+  /// The organisation's access key, stored as a sha256 hash — the key itself
+  /// is shown once when it is issued and is not recoverable afterwards. It is
+  /// a credential, and a credential we could read back is one that can leak
+  /// from a backup.
+  ///
+  /// Unique so two memberships can never share a key, which would otherwise
+  /// be silently possible and impossible to diagnose.
+  accessKeyHash     String?   @unique
+  /// The last four characters, so a member can tell which key they are
+  /// holding without us keeping the whole thing.
+  accessKeyHint     String?
+  accessKeyIssuedAt DateTime?
 
   /// Who admitted, froze or unfroze this membership, and why. Recorded rather
   /// than inferred: suspending someone's paid access is a human decision and

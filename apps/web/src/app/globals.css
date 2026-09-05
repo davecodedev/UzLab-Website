@@ -156,3 +156,24 @@ body {
   transform: skewX(var(--uz-slash-angle));
   border-radius: 2px;
 }
+
+/* The registry filter panel scrolls inside itself when it is taller than the
+   window. On macOS the overlay scrollbar stays hidden until something moves,
+   so without this the panel just looks cut off — and that is exactly how it
+   was reported. A thin permanent track says "there is more here". */
+.reg-filter-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--uz-border-strong) transparent;
+}
+.reg-filter-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.reg-filter-scroll::-webkit-scrollbar-thumb {
+  background: var(--uz-border-strong);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.reg-filter-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}

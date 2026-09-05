@@ -560,7 +560,7 @@ export function RegistryApp({ laboratories }: { laboratories: Laboratory[] }) {
             inside itself, capped to the window, so every filter is reachable
             from the moment the page opens. `overscroll-contain` stops that
             scroll from continuing into the page once it hits the end. */}
-        <div className="reg-print-hide w-full flex-none space-y-4 lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto lg:overscroll-contain lg:pr-1.5 lg:w-[308px]">
+        <div className="reg-print-hide w-full flex-none space-y-4 lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto lg:overscroll-contain lg:pr-2 lg:w-[312px] reg-filter-scroll">
           <FiltersCard
             lang={lang}
             filters={filters}
@@ -705,7 +705,7 @@ function labelClass() {
   return "reg-mono block text-[11px] font-semibold uppercase tracking-[0.08em]";
 }
 function inputClass() {
-  return "reg-input mt-1.5 w-full rounded-[7px] px-3 py-2 text-sm outline-none";
+  return "reg-input mt-1 w-full rounded-[7px] px-3 py-2 text-sm outline-none";
 }
 
 function FiltersCard({
@@ -738,18 +738,36 @@ function FiltersCard({
         )}
       </div>
 
-      <div className="space-y-3">
-        <div>
-          <label className={labelClass()} style={{ color: "var(--reg-gray-2)" }}>
-            {t("regNo", lang)}
-          </label>
-          <input
-            value={filters.regNo}
-            onChange={(e) => updateFilter("regNo", e.target.value)}
-            placeholder="O'ZAK.SL.…"
-            className={inputClass()}
-            style={{ border: "1px solid var(--reg-border)" }}
-          />
+      <div className="space-y-2">
+        {/* Two short codes side by side. Pairing the narrow fields is what
+            lets the whole filter list stand up in one screen instead of
+            trailing below the fold. */}
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className={labelClass()} style={{ color: "var(--reg-gray-2)" }}>
+              {t("regNo", lang)}
+            </label>
+            <input
+              value={filters.regNo}
+              onChange={(e) => updateFilter("regNo", e.target.value)}
+              placeholder="O'ZAK.SL.…"
+              className={inputClass()}
+              style={{ border: "1px solid var(--reg-border)" }}
+            />
+          </div>
+          <div>
+            <label className={labelClass()} style={{ color: "var(--reg-gray-2)" }}>
+              {t("taxId", lang)}
+            </label>
+            <input
+              value={filters.taxId}
+              onChange={(e) => updateFilter("taxId", e.target.value)}
+              placeholder={t("taxIdPlaceholder", lang)}
+              inputMode="numeric"
+              className={`reg-mono ${inputClass()}`}
+              style={{ border: "1px solid var(--reg-border)" }}
+            />
+          </div>
         </div>
 
         <div>
@@ -781,7 +799,7 @@ function FiltersCard({
               </option>
             ))}
           </select>
-          <p className="mt-1 text-[11px] leading-snug" style={{ color: "var(--reg-gray-2)" }}>
+          <p className="mt-1 text-[10.5px] leading-[1.35]" style={{ color: "var(--reg-gray-2)" }}>
             {t("registerHint", lang)}
           </p>
         </div>
@@ -805,60 +823,49 @@ function FiltersCard({
           </select>
         </div>
 
-        <div>
-          <label className={labelClass()} style={{ color: "var(--reg-gray-2)" }}>
-            {t("taxId", lang)}
-          </label>
-          <input
-            value={filters.taxId}
-            onChange={(e) => updateFilter("taxId", e.target.value)}
-            placeholder={t("taxIdPlaceholder", lang)}
-            inputMode="numeric"
-            className={`reg-mono ${inputClass()}`}
-            style={{ border: "1px solid var(--reg-border)" }}
-          />
-        </div>
 
-        <div>
-          <label className={labelClass()} style={{ color: "var(--reg-gray-2)" }}>
-            {t("region", lang)}
-          </label>
-          <select
-            value={filters.region}
-            onChange={(e) => updateFilter("region", e.target.value)}
-            className={`reg-select ${inputClass()}`}
-            style={{ border: "1px solid var(--reg-border)" }}
-          >
-            <option value="">{t("allRegions", lang)}</option>
-            <option value={UNSPECIFIED_REGION}>{UNSPECIFIED_REGION_LABEL[lang]}</option>
-            <optgroup label={t("regionsGroup", lang)}>
-              {REGION_OPTIONS.map((r) => (
-                <option key={r.value} value={r.value}>
-                  {r.label[lang]}
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className={labelClass()} style={{ color: "var(--reg-gray-2)" }}>
+              {t("region", lang)}
+            </label>
+            <select
+              value={filters.region}
+              onChange={(e) => updateFilter("region", e.target.value)}
+              className={`reg-select ${inputClass()}`}
+              style={{ border: "1px solid var(--reg-border)" }}
+            >
+              <option value="">{t("allRegions", lang)}</option>
+              <option value={UNSPECIFIED_REGION}>{UNSPECIFIED_REGION_LABEL[lang]}</option>
+              <optgroup label={t("regionsGroup", lang)}>
+                {REGION_OPTIONS.map((r) => (
+                  <option key={r.value} value={r.value}>
+                    {r.label[lang]}
+                  </option>
+                ))}
+              </optgroup>
+            </select>
+          </div>
+          <div>
+            <label className={labelClass()} style={{ color: "var(--reg-gray-2)" }}>
+              {t("status", lang)}
+            </label>
+            <select
+              value={filters.status}
+              onChange={(e) => updateFilter("status", e.target.value)}
+              className={`reg-select ${inputClass()}`}
+              style={{ border: "1px solid var(--reg-border)" }}
+            >
+              <option value="">{t("anyStatus", lang)}</option>
+              {STATUS_OPTIONS.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label[lang]}
                 </option>
               ))}
-            </optgroup>
-          </select>
+            </select>
+          </div>
         </div>
 
-        <div>
-          <label className={labelClass()} style={{ color: "var(--reg-gray-2)" }}>
-            {t("status", lang)}
-          </label>
-          <select
-            value={filters.status}
-            onChange={(e) => updateFilter("status", e.target.value)}
-            className={`reg-select ${inputClass()}`}
-            style={{ border: "1px solid var(--reg-border)" }}
-          >
-            <option value="">{t("anyStatus", lang)}</option>
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label[lang]}
-              </option>
-            ))}
-          </select>
-        </div>
 
         <div>
           <label className={labelClass()} style={{ color: "var(--reg-gray-2)" }}>
@@ -889,36 +896,38 @@ function FiltersCard({
             className={inputClass()}
             style={{ border: "1px solid var(--reg-border)" }}
           />
-          <p className="mt-1.5 text-[11.5px] leading-snug" style={{ color: "var(--reg-gray-3)" }}>
+          <p className="mt-1 text-[10.5px] leading-[1.35]" style={{ color: "var(--reg-gray-3)" }}>
             {t("keywordsHint", lang)}
           </p>
         </div>
 
-        <div>
-          <label className={labelClass()} style={{ color: "var(--reg-gray-2)" }}>
-            {t("standardDoc", lang)}
-          </label>
-          <input
-            value={filters.standardDoc}
-            onChange={(e) => updateFilter("standardDoc", e.target.value)}
-            placeholder={t("standardDocPlaceholder", lang)}
-            className={inputClass()}
-            style={{ border: "1px solid var(--reg-border)" }}
-          />
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className={labelClass()} style={{ color: "var(--reg-gray-2)" }}>
+              {t("standardDoc", lang)}
+            </label>
+            <input
+              value={filters.standardDoc}
+              onChange={(e) => updateFilter("standardDoc", e.target.value)}
+              placeholder={t("standardDocPlaceholder", lang)}
+              className={inputClass()}
+              style={{ border: "1px solid var(--reg-border)" }}
+            />
+          </div>
+          <div>
+            <label className={labelClass()} style={{ color: "var(--reg-gray-2)" }}>
+              {t("stakeholder", lang)}
+            </label>
+            <input
+              value={filters.stakeholder}
+              onChange={(e) => updateFilter("stakeholder", e.target.value)}
+              placeholder={t("stakeholderPlaceholder", lang)}
+              className={inputClass()}
+              style={{ border: "1px solid var(--reg-border)" }}
+            />
+          </div>
         </div>
 
-        <div>
-          <label className={labelClass()} style={{ color: "var(--reg-gray-2)" }}>
-            {t("stakeholder", lang)}
-          </label>
-          <input
-            value={filters.stakeholder}
-            onChange={(e) => updateFilter("stakeholder", e.target.value)}
-            placeholder={t("stakeholderPlaceholder", lang)}
-            className={inputClass()}
-            style={{ border: "1px solid var(--reg-border)" }}
-          />
-        </div>
 
         <div className="rounded-[7px] px-3 py-2.5" style={{ border: "1px solid var(--reg-border)", background: "var(--reg-panel)" }}>
           <label className="flex cursor-pointer items-center gap-2 text-sm font-medium" style={{ color: "var(--reg-ink)" }}>
