@@ -86,6 +86,53 @@ export function buildStandardSearchKey(
  * Runs a scrape, judges it, and only then writes. Returns nothing; the outcome
  * is in ImportRun and on stdout.
  */
+/**
+ * Failures that mean "the connection went away", as opposed to "the database
+ * said no".
+ *
+ * Railway's public Postgres proxy closes a connection that has been open a
+ * long time. A 26 000-row update loop takes twenty-odd minutes, so it gets
+ * closed mid-flight — and because the run recorded nothing, two thirds of the
+ * work is thrown away and the next attempt starts from the beginning. That is
+ * how the ISO catalogue sat six weeks out of date while every manual attempt
+ * to fix it died at roughly the same point.
+ *
+ * The scheduled runs go over Railway's internal host and never see this. A run
+ * from a laptop does.
+ */
+const RETRYABLE_CONNECTION_ERROR =
+  /Connection terminated|Connection ended|ECONNRESET|socket hang up|Timed out fetching a new connection|connection closed|server closed the connection/i;
+
+/**
+ * Retries one chunk through a dropped connection, with backoff.
+ *
+ * Only connection-level failures. A unique-constraint violation is a real
+ * answer, and retrying it would do nothing but take longer to fail. Prisma
+ * opens a fresh connection on the next query, so there is nothing to reset
+ * here beyond waiting.
+ */
+async function withRetry<T>(
+  label: string,
+  run: () => Promise<T>,
+  attempts = 5,
+): Promise<T> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await run();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (attempt >= attempts || !RETRYABLE_CONNECTION_ERROR.test(message)) {
+        throw err;
+      }
+      const waitMs = 1_000 * 2 ** (attempt - 1);
+      console.warn(
+        `  ${label}: ${message.split('\n')[0]} — retrying in ${waitMs}ms (${attempt}/${attempts - 1})`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+    }
+  }
+}
+
 export async function runStandardImport(
   opts: StandardRunOptions,
   scrape: () => Promise<StandardScrapeResult>,
@@ -185,7 +232,10 @@ export async function runStandardImport(
     }
 
     for (let i = 0; i < toCreate.length; i += CREATE_CHUNK) {
-      await prisma.standard.createMany({ data: toCreate.slice(i, i + CREATE_CHUNK) });
+      const slice = toCreate.slice(i, i + CREATE_CHUNK);
+      await withRetry(`create chunk at ${i}`, () =>
+        prisma.standard.createMany({ data: slice }),
+      );
       console.log(`  created ${Math.min(i + CREATE_CHUNK, toCreate.length)}/${toCreate.length}`);
     }
 
@@ -194,10 +244,16 @@ export async function runStandardImport(
     // limit is about not opening more connections than the pool holds, not
     // about load: this work is waiting on the network, not on Postgres.
     for (let i = 0; i < toUpdate.length; i += UPDATE_CONCURRENCY) {
-      await Promise.all(
-        toUpdate
-          .slice(i, i + UPDATE_CONCURRENCY)
-          .map((u) => prisma.standard.update({ where: { id: u.id }, data: u.data })),
+      const slice = toUpdate.slice(i, i + UPDATE_CONCURRENCY);
+      // Retried per chunk rather than per row: the whole chunk is re-applied,
+      // and every write here is idempotent, so replaying one costs a little
+      // time and changes nothing.
+      await withRetry(`update chunk at ${i}`, () =>
+        Promise.all(
+          slice.map((u) =>
+            prisma.standard.update({ where: { id: u.id }, data: u.data }),
+          ),
+        ),
       );
       const done = Math.min(i + UPDATE_CONCURRENCY, toUpdate.length);
       if (done % PROGRESS_EVERY < UPDATE_CONCURRENCY) {
