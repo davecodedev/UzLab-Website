@@ -114,7 +114,12 @@ const RETRYABLE_CONNECTION_ERROR =
 async function withRetry<T>(
   label: string,
   run: () => Promise<T>,
-  attempts = 5,
+  // Eight, not five. Five gave up after fifteen seconds of backoff, which is
+  // not long enough when the proxy is refusing new connections rather than
+  // dropping an old one — the ISO backfill died at the same chunk three times
+  // with attempts to spare. Eight spends about four minutes before admitting
+  // defeat, which is cheap against an hour-long import.
+  attempts = 8,
 ): Promise<T> {
   for (let attempt = 1; ; attempt += 1) {
     try {
@@ -124,7 +129,10 @@ async function withRetry<T>(
       if (attempt >= attempts || !RETRYABLE_CONNECTION_ERROR.test(message)) {
         throw err;
       }
-      const waitMs = 1_000 * 2 ** (attempt - 1);
+      // Capped: doubling unbounded would have the last attempt waiting two
+      // minutes on its own, and a proxy that is still refusing after thirty
+      // seconds is not going to be persuaded by a longer pause.
+      const waitMs = Math.min(1_000 * 2 ** (attempt - 1), 30_000);
       console.warn(
         `  ${label}: ${message.split('\n')[0]} — retrying in ${waitMs}ms (${attempt}/${attempts - 1})`,
       );
