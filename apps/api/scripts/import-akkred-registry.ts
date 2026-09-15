@@ -19,7 +19,7 @@
 //
 // Usage: npm run import:akkred --workspace=apps/api
 import 'dotenv/config';
-import { PrismaPg } from '@prisma/adapter-pg';
+import { importPrisma } from './lib/db';
 import {
   PrismaClient,
   LaboratoryField,
@@ -257,8 +257,7 @@ async function scrape(): Promise<ScrapeResult> {
 }
 
 async function main() {
-  const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
-  const prisma = new PrismaClient({ adapter });
+  const prisma = importPrisma();
   const trigger = process.env.IMPORT_TRIGGER ?? 'manual';
   const force = process.argv.includes('--force');
 

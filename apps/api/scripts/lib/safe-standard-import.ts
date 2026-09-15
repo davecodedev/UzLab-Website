@@ -101,7 +101,7 @@ export function buildStandardSearchKey(
  * from a laptop does.
  */
 const RETRYABLE_CONNECTION_ERROR =
-  /Connection terminated|Connection ended|ECONNRESET|socket hang up|Timed out fetching a new connection|connection closed|server closed the connection/i;
+  /Connection terminated|Connection ended|ECONNRESET|socket hang up|Timed out fetching a new connection|connection closed|server closed the connection|Query read timeout|query_timeout|statement timeout|timeout exceeded/i;
 
 /**
  * Retries one chunk through a dropped connection, with backoff.

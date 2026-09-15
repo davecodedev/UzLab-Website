@@ -13,8 +13,8 @@
 //
 // Usage: npm run import:uzsti --workspace=apps/api
 import 'dotenv/config';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient, StandardRegister, StandardStatus } from '@prisma/client';
+import { importPrisma } from './lib/db';
+import {StandardRegister, StandardStatus} from '@prisma/client';
 import { slugify } from '../src/common/utils/slugify';
 import {
   runStandardImport,
@@ -226,8 +226,7 @@ async function scrape(): Promise<StandardScrapeResult> {
 }
 
 async function main() {
-  const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
-  const prisma = new PrismaClient({ adapter });
+  const prisma = importPrisma();
   const trigger = process.env.IMPORT_TRIGGER ?? 'manual';
   const force = process.argv.includes('--force');
 

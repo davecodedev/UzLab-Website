@@ -15,8 +15,8 @@
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { PrismaClient, StandardRegister, StandardStatus } from '@prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
+import { StandardRegister, StandardStatus } from '@prisma/client';
+import { importPrisma } from './lib/db';
 import {
   RESULT_CAP,
   listCommitteeCodes,
@@ -367,8 +367,7 @@ async function main() {
     console.log(`crawl parked at ${CACHE_PATH}`);
   }
 
-  const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
-  const prisma = new PrismaClient({ adapter });
+  const prisma = importPrisma();
   const trigger = process.env.IMPORT_TRIGGER ?? 'manual';
   const force = process.argv.includes('--force');
 

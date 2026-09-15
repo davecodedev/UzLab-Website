@@ -11,8 +11,8 @@
 //   npm run fetch:mgs-details --workspace=apps/api            # one batch
 //   BATCH=2000 npm run fetch:mgs-details --workspace=apps/api # a larger one
 import 'dotenv/config';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient, StandardRegister } from '@prisma/client';
+import { importPrisma } from './lib/db';
+import {StandardRegister} from '@prisma/client';
 import { buildStandardSearchKey } from './lib/safe-standard-import';
 
 const BASE = 'https://mgscatalog.by';
@@ -100,8 +100,7 @@ async function fetchDetail(sourceId: string): Promise<string | null> {
 }
 
 async function main() {
-  const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
-  const prisma = new PrismaClient({ adapter });
+  const prisma = importPrisma();
   const batch = Number(process.env.BATCH ?? DEFAULT_BATCH);
 
   try {
