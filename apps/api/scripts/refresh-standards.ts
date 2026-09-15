@@ -1,4 +1,4 @@
-// The scheduled refresh for both standards catalogues, in one process.
+// The scheduled refresh for all three standards catalogues, in one process.
 //
 // One process rather than two Railway cron services because the project is on
 // the free plan and cannot provision more of them. That is the only reason: if
@@ -13,6 +13,15 @@
 //     at ~5s each; they fill in over weeks rather than in one pass, and doing a
 //     little every night is the only version of this that is polite to a small
 //     government server.
+//   * ISO weekly, on a different day from MGS. It is a single file download and
+//     then ~26 500 upserts, which takes the best part of an hour — too long to
+//     stack on the same night as the MGS crawl, and more than the catalogue
+//     changes in a day warrants.
+//
+// ISO was missing from this list until 15 September 2026, which is why the
+// provenance block sat at "last verified 3 August" for six weeks while the
+// other two stayed current. If a catalogue is advertised on the site, its
+// refresh belongs here.
 //
 // Every step is attempted even if an earlier one fails — a broken UZSTI crawl
 // must not silently stop the MGS one — and each records its own ImportRun, so
@@ -24,6 +33,8 @@ import { spawnSync } from 'child_process';
 
 /** UTC day-of-week for the full MGS crawl. 0 = Sunday. */
 const MGS_CRAWL_DAY = Number(process.env.MGS_CRAWL_DAY ?? 0);
+/** And for ISO. 3 = Wednesday, deliberately not the MGS day. */
+const ISO_CRAWL_DAY = Number(process.env.ISO_CRAWL_DAY ?? 3);
 /** Detail pages per nightly run. Deliberately small. */
 const MGS_DETAIL_BATCH = process.env.MGS_DETAIL_BATCH ?? '300';
 
@@ -69,6 +80,17 @@ function main() {
     script: 'scripts/fetch-mgs-details.ts',
     env: { BATCH: MGS_DETAIL_BATCH },
   });
+
+  if (today === ISO_CRAWL_DAY) {
+    steps.push({
+      name: 'ISO catalogue',
+      script: 'scripts/import-iso-standards.ts',
+    });
+  } else {
+    console.log(
+      `ISO refresh runs on UTC day ${ISO_CRAWL_DAY}; today is ${today}, so it is skipped.`,
+    );
+  }
 
   const failed = steps.filter((step) => !run(step)).map((s) => s.name);
 

@@ -24,7 +24,9 @@ const STANDARD_SOURCES = [
     register: StandardRegister.ISO,
     name: 'International Organization for Standardization (ISO Open Data)',
     url: 'https://www.iso.org/open-data.html',
-    refresh: 'daily',
+    // Weekly, not daily. It said daily for six weeks while nothing ran it at
+    // all; a cadence the site advertises has to be one the scheduler keeps.
+    refresh: 'weekly',
   },
 ] as const;
 
