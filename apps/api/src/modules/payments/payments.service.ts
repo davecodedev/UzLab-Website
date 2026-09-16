@@ -8,6 +8,7 @@ import { PaymentGateway, PaymentStatus } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service.js';
 import { MembershipsService } from './memberships.service.js';
 import { ClickService } from './click.service.js';
+import { XaznaService } from './xazna.service.js';
 
 /**
  * Raising an invoice and pointing the payer at a gateway.
@@ -23,6 +24,7 @@ export class PaymentsService {
     private readonly config: ConfigService,
     private readonly memberships: MembershipsService,
     private readonly click: ClickService,
+    private readonly xazna: XaznaService,
   ) {}
 
   /**
@@ -41,6 +43,7 @@ export class PaymentsService {
           !!this.config.get<string>('PAYME_MERCHANT_KEY'),
         currencies: ['UZS'],
       },
+      XAZNA: { available: this.xazna.configured, currencies: ['UZS'] },
       // Nothing to configure: an invoice can always be raised. Whether the
       // account details are published is a separate question, answered by
       // `bankDetails().configured`.
@@ -254,6 +257,19 @@ export class PaymentsService {
         `c=${returnUrl}`,
       ].join(';');
       return `https://checkout.paycom.uz/${Buffer.from(params).toString('base64')}`;
+    }
+
+    if (gateway === PaymentGateway.XAZNA) {
+      // Xazna takes the amount in so'm here, and reads the invoice back off
+      // our own endpoint before charging anything — so this URL carries no
+      // more than the merchant, the sum and which invoice it is.
+      const params = new URLSearchParams({
+        merchantId: this.config.get<string>('XAZNA_MERCHANT_ID') ?? '',
+        amount: String(Math.round(amountMinor / 100)),
+        invoice: paymentId,
+        returnURL: returnUrl,
+      });
+      return `https://pay.xazna.uz/billing/universal?${params.toString()}`;
     }
 
     // `transaction_param` is what comes back as `merchant_trans_id` on both

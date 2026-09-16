@@ -8,6 +8,7 @@ import { PaymentsController } from '../src/modules/payments/payments.controller.
 import { PaymentsService } from '../src/modules/payments/payments.service.js';
 import { PaymeService } from '../src/modules/payments/payme.service.js';
 import { ClickService } from '../src/modules/payments/click.service.js';
+import { XaznaService } from '../src/modules/payments/xazna.service.js';
 import { MembershipsService } from '../src/modules/payments/memberships.service.js';
 import { PrismaService } from '../src/common/prisma/prisma.service.js';
 
@@ -120,6 +121,9 @@ describe('Click callbacks', () => {
           },
         },
         { provide: PaymeService, useValue: {} },
+        // PaymentsService asks every gateway whether it is configured, so the
+        // ones this suite is not exercising still have to be present.
+        { provide: XaznaService, useValue: { configured: false } },
       ],
     }).compile();
 

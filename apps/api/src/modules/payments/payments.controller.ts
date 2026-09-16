@@ -14,6 +14,8 @@ import { PaymentsService } from './payments.service.js';
 import { PaymeService } from './payme.service.js';
 import { PaymeError, PaymeErrorCode } from './payme.errors.js';
 import { ClickService, type ClickCallback } from './click.service.js';
+import { XaznaService, type XaznaParams } from './xazna.service.js';
+import { XaznaError, XaznaErrorCode } from './xazna.errors.js';
 import {
   ConfirmPaymentDto,
   CreateInvoiceDto,
@@ -30,6 +32,7 @@ export class PaymentsController {
     private readonly payments: PaymentsService,
     private readonly payme: PaymeService,
     private readonly click: ClickService,
+    private readonly xazna: XaznaService,
   ) {}
 
   @UseGuards(JwtAuthGuard)
@@ -147,4 +150,40 @@ export class PaymentsController {
   clickComplete(@Body() body: ClickCallback) {
     return this.click.complete(body);
   }
+
+  /**
+   * Xazna's merchant endpoint.
+   *
+   * One JSON-RPC path for getinfo/pay/check, authenticated with HTTP Basic.
+   * Always answers 200 with an envelope — Xazna reads `error`, and treats a
+   * non-200 as the merchant being down rather than as a refusal, so the
+   * failures are caught here instead of reaching Nest's exception filter.
+   */
+  @HttpCode(200)
+  @SkipThrottle()
+  @Post('xazna')
+  async xaznaCallback(
+    @Headers('authorization') auth: string | undefined,
+    @Body()
+    body: { method?: string; params?: XaznaParams; id?: string | number },
+  ) {
+    const id = body?.id ?? null;
+    try {
+      this.xazna.checkAuth(auth);
+      const result = await this.xazna.handle(
+        body?.method ?? '',
+        body?.params ?? {},
+      );
+      return { jsonrpc: '2.0', id, result };
+    } catch (err) {
+      const error =
+        err instanceof XaznaError
+          ? err
+          : new XaznaError(XaznaErrorCode.UNKNOWN);
+      // `result: null` alongside `error` is the shape the guide's own failure
+      // example uses.
+      return { jsonrpc: '2.0', id, result: null, error: error.toJson() };
+    }
+  }
+
 }

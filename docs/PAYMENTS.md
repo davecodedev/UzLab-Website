@@ -22,8 +22,14 @@ editing; it upserts by slug, so existing members keep their type.
 | Method        | Grants membership          | Currency | Offered on the site |
 | ------------- | -------------------------- | -------- | ------------------- |
 | Click         | automatically, on Complete | UZS only | **live** — credentials set, awaiting first real payment |
+| Xazna         | automatically, on `pay`    | UZS only | code ready, awaiting credentials |
 | Payme         | automatically, on Perform  | UZS only | no — code exists, not surfaced |
 | Bank transfer | staff confirm by hand      | any      | no — arranged by e-mail, confirmed in `/admin/payments` |
+
+Where more than one card gateway is switched on, the checkout offers one
+button each, named for the provider. That is not the method chooser that was
+removed earlier: nobody is asked to decide between a card and paperwork before
+they have decided to join — they are picking a wallet they already have.
 
 Bank transfer is deliberately no longer self-service. The API and the staff
 queue still work, so a transfer agreed over e-mail is still recorded and still
@@ -146,6 +152,74 @@ cabinet.
 What is left is a single real card payment on the cheapest tier, watched
 end to end, then refunded from the Click cabinet. Nothing before that proves
 money actually moves.
+
+## Xazna
+
+Shaped unlike the other two. Click pushes Prepare and Complete at us and signs
+each with MD5; Xazna asks us to **host** a JSON-RPC endpoint that it calls,
+authenticated with HTTP Basic, and it reads the invoice back off us before it
+takes any money.
+
+### What Xazna needs from us
+
+| Field | Value |
+| ----- | ----- |
+| API endpoint | `https://api-production-3463.up.railway.app/api/payments/xazna` |
+| Auth | HTTP Basic — username and password we choose and give them |
+| Return URL | `https://uzlab.org/account` |
+
+The redirect we send payers to is
+`https://pay.xazna.uz/billing/universal?merchantId=…&amount=…&invoice=…&returnURL=…`,
+with `amount` in so'm and `invoice` being our `Payment.id`.
+
+### What we need from Xazna
+
+Only one value, `XAZNA_MERCHANT_ID` — the rest of the credentials run the other
+way, because it is Xazna that authenticates to us. `XAZNA_BASIC_USER` and
+`XAZNA_BASIC_PASSWORD` are ours to invent and hand over.
+
+### The three methods
+
+- **`getinfo`** — what is this invoice worth? Answers `amount` in tiyin, plus a
+  `details` object; the guide invites extra fields and Xazna shows them to the
+  payer before they confirm, so it carries the package name and the number of
+  days.
+- **`pay`** — the money moved. Idempotent: a repeat of the *same*
+  `xaznaTransactionId` answers success again without granting a second
+  membership, while a *different* transaction against a settled invoice is
+  refused with `-2`, because agreeing to it would be agreeing to something we
+  cannot honour. Membership is granted in the same transaction as the status
+  change.
+- **`check`** — did transaction X succeed? Looked up by Xazna's id, not ours.
+
+Errors use Xazna's four codes: `-1` invoice not found, `-2` already paid, `-3`
+merchant unavailable (also what a bad Basic header gets — the guide has no code
+for "your credentials are wrong", and that is the one of the four that does not
+blame the payer), `-4` everything else.
+
+### One ambiguity in the guide, and how it is handled
+
+The guide is not consistent about the unit of `amount`. The redirect takes
+so'm, `getinfo` is specified to answer in tiyin, and the `pay` example shows
+`"amount": 100000, // 100000 so'm`.
+
+`pay` therefore accepts **either** representation of that invoice and nothing
+else. A 500 000 so'm invoice accepts `500000` or `50000000`; every other number
+is refused. That is not a loophole — both figures come from the same invoice,
+so there is no amount an underpayer could send that satisfies either. When
+Xazna confirms which they actually send, narrow it to one and delete the
+fallback.
+
+### Testing it
+
+`apps/api/test/xazna.e2e-spec.ts` — 14 cases over the real Express adapter and
+the production `ValidationPipe`, covering all three methods, Basic auth, the
+four error codes, `pay` idempotency, the double-payment refusal and the unit
+ambiguity.
+
+```bash
+npm run test:e2e --workspace apps/api
+```
 
 ## Bank transfer
 

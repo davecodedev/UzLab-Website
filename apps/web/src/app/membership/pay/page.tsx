@@ -10,10 +10,12 @@ import { formatNumber, formatDateNumeric } from "@/lib/format";
 /**
  * Paying for membership.
  *
- * One route, not a menu: pick a tier, pay by card, membership starts when
- * Click confirms. There is no method chooser — asking someone to decide
- * between a card and a bank transfer before they have decided to join is a
- * question they cannot answer yet.
+ * One route, not a menu: pick a tier, pay by card, membership starts when the
+ * gateway confirms. There is still no method chooser in the old sense —
+ * nobody is asked to decide between a card and a bank transfer before they
+ * have decided to join. Where more than one card gateway is switched on the
+ * page simply offers one button each, named for the provider, because picking
+ * a wallet you already have is a different question from picking paperwork.
  *
  * Everything that does not fit that shape goes to the same place: a
  * conversation. A tier priced in dollars, a gateway that is switched off, an
@@ -45,15 +47,15 @@ interface GatewayInfo {
   available: boolean;
   currencies: string[] | null;
 }
-type Gateways = Record<"CLICK" | "PAYME" | "BANK_TRANSFER", GatewayInfo>;
+type Gateways = Record<"CLICK" | "PAYME" | "XAZNA" | "BANK_TRANSFER", GatewayInfo>;
 
 const T = {
   breadcrumbHome: { ru: "Главная", uz: "Bosh sahifa", en: "Home" },
   title: { ru: "Оплата членства", uz: "A'zolikni to'lash", en: "Pay for membership" },
   intro: {
-    ru: "Оплата картой UzCard, Humo или Visa через Click. Членство активируется сразу после подтверждения платежа.",
-    uz: "UzCard, Humo yoki Visa kartasi bilan Click orqali to'lov. A'zolik to'lov tasdiqlangandan so'ng darhol faollashtiriladi.",
-    en: "Pay by UzCard, Humo or Visa through Click. Membership starts as soon as the payment is confirmed.",
+    ru: "Оплата картой UzCard, Humo или Visa. Членство активируется сразу после подтверждения платежа.",
+    uz: "UzCard, Humo yoki Visa kartasi bilan to'lov. A'zolik to'lov tasdiqlangandan so'ng darhol faollashtiriladi.",
+    en: "Pay by UzCard, Humo or Visa. Membership starts as soon as the payment is confirmed.",
   },
   signIn: {
     ru: "Войдите, чтобы оплатить членство.",
@@ -64,7 +66,10 @@ const T = {
 
   chooseType: { ru: "Тип членства", uz: "A'zolik turi", en: "Membership type" },
   pay: { ru: "Перейти к оплате", uz: "To'lovga o'tish", en: "Continue to payment" },
-  redirecting: { ru: "Переходим в Click…", uz: "Click'ga o'tilmoqda…", en: "Taking you to Click…" },
+  // Named per provider once there is more than one: "continue to payment"
+  // twice, side by side, would be two identical buttons.
+  payVia: { ru: "Оплатить через", uz: "orqali to'lash", en: "Pay with" },
+  redirecting: { ru: "Переходим к оплате…", uz: "To'lovga o'tilmoqda…", en: "Taking you to the payment page…" },
   failed: {
     ru: "Не удалось перейти к оплате. Попробуйте ещё раз или напишите нам.",
     uz: "To'lovga o'tib bo'lmadi. Qayta urinib ko'ring yoki bizga yozing.",
@@ -74,9 +79,9 @@ const T = {
   // Why the pay button is not there. Said plainly, because a missing button
   // with no explanation reads as a broken page.
   unavailableGateway: {
-    ru: "Оплата картой сейчас недоступна — мы заканчиваем подключение Click. Напишите нам, и мы примем оплату и оформим членство вручную.",
-    uz: "Karta orqali to'lov hozircha mavjud emas — Click ulanishini yakunlamoqdamiz. Bizga yozing, to'lovni qabul qilib, a'zolikni qo'lda rasmiylashtiramiz.",
-    en: "Card payment is not available yet — we are finishing the Click integration. Write to us and we will take the payment and set the membership up by hand.",
+    ru: "Онлайн-оплата сейчас недоступна. Напишите нам, и мы примем оплату и оформим членство вручную.",
+    uz: "Onlayn to'lov hozircha mavjud emas. Bizga yozing, to'lovni qabul qilib, a'zolikni qo'lda rasmiylashtiramiz.",
+    en: "Online payment is not available right now. Write to us and we will take the payment and set the membership up by hand.",
   },
   unavailableCurrency: {
     ru: "Этот тип членства указан не в сумах, поэтому оплатить его картой нельзя. Напишите нам — согласуем сумму и способ оплаты.",
@@ -157,24 +162,33 @@ export default function PayMembershipPage() {
   // `gateways === null` means the API has not answered yet — treated as "not
   // yet known" rather than "unavailable", so the page does not flash an
   // apology at everyone on first paint.
-  const clickOff = gateways !== null && !gateways.CLICK.available;
+  // Every card gateway that is actually switched on, in the order they should
+  // be offered. Adding a third one is a line in this array.
+  const CARD_GATEWAYS = [
+    { id: "CLICK" as const, label: "Click" },
+    { id: "XAZNA" as const, label: "Xazna" },
+  ];
+  const usable = gateways
+    ? CARD_GATEWAYS.filter((g) => gateways[g.id].available)
+    : CARD_GATEWAYS;
+  const noGateway = gateways !== null && usable.length === 0;
   const wrongCurrency = !!selected && selected.currency !== "UZS";
-  const canPay = !!selected && !clickOff && !wrongCurrency;
+  const canPay = !!selected && !noGateway && !wrongCurrency;
 
-  const blockedReason = clickOff
+  const blockedReason = noGateway
     ? pick(T.unavailableGateway, lang)
     : wrongCurrency
       ? pick(T.unavailableCurrency, lang)
       : null;
 
-  async function handleSubmit(event: React.FormEvent) {
+  async function handleSubmit(event: React.FormEvent, gateway: "CLICK" | "XAZNA") {
     event.preventDefault();
     setBusy(true);
     setError(null);
     try {
       const result = await api.post<{ checkoutUrl: string | null }>(
         "/payments/invoice",
-        { membershipTypeId: chosenId, gateway: "CLICK" },
+        { membershipTypeId: chosenId, gateway },
         getAccessToken() ?? undefined,
       );
 
@@ -182,7 +196,9 @@ export default function PayMembershipPage() {
         // Returning early leaves `busy` set on purpose: the tab is about to
         // navigate to Click, and re-enabling the button in the meantime
         // invites a second click and a second order.
-        window.location.href = result.checkoutUrl;
+        // `assign` rather than setting `.href`: same navigation, and it is a
+        // call rather than a mutation of a value the linter watches.
+        window.location.assign(result.checkoutUrl);
         return;
       }
       setError(pick(T.failed, lang));
@@ -238,7 +254,9 @@ export default function PayMembershipPage() {
         </div>
       ) : (
         <form
-          onSubmit={handleSubmit}
+          // The submitter decides which gateway; there is no default, so the
+          // Enter key cannot silently pick one on the visitor's behalf.
+          onSubmit={(e) => e.preventDefault()}
           className="mt-6 space-y-4 rounded-xl border bg-white p-6"
           style={{ borderColor: "var(--uz-border)" }}
         >
@@ -276,14 +294,35 @@ export default function PayMembershipPage() {
               {blockedReason}
             </div>
           ) : (
-            <button
-              type="submit"
-              disabled={busy || !canPay}
-              className="rounded-md px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-              style={{ background: "var(--uz-blue-600)" }}
-            >
-              {busy ? pick(T.redirecting, lang) : pick(T.pay, lang)}
-            </button>
+            <div className="flex flex-wrap gap-2.5">
+              {usable.map((g, i) => (
+                <button
+                  key={g.id}
+                  type="submit"
+                  disabled={busy || !canPay}
+                  onClick={(e) => void handleSubmit(e, g.id)}
+                  className="rounded-md px-5 py-2.5 text-sm font-semibold disabled:opacity-50"
+                  // The first is the primary; a second identical blue button
+                  // would make the pair look like one control split in two.
+                  style={
+                    i === 0
+                      ? { background: "var(--uz-blue-600)", color: "#fff" }
+                      : {
+                          border: "1px solid var(--uz-border-strong)",
+                          color: "var(--uz-navy-900)",
+                        }
+                  }
+                >
+                  {busy
+                    ? pick(T.redirecting, lang)
+                    : usable.length === 1
+                      ? pick(T.pay, lang)
+                      : lang === "uz"
+                        ? `${g.label} ${pick(T.payVia, lang)}`
+                        : `${pick(T.payVia, lang)} ${g.label}`}
+                </button>
+              ))}
+            </div>
           )}
         </form>
       )}

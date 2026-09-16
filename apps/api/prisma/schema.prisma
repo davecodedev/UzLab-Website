@@ -660,6 +660,10 @@ model IcsClass {
 enum PaymentGateway {
   PAYME // JSON-RPC merchant API, amounts in tiyin
   CLICK // Prepare/Complete callbacks, MD5-signed
+  /// Xazna (Xalq Banki's e-commerce wallet). JSON-RPC over HTTP Basic, with
+  /// getinfo/pay/check. Unlike the other two it calls us to read the invoice
+  /// before it takes any money.
+  XAZNA
   /// Bank transfer against an invoice, confirmed by staff against the
   /// statement. No gateway is involved, which is why this one may be raised in
   /// a currency the gateways cannot settle.
