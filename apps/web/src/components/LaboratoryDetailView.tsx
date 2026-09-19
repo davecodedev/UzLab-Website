@@ -19,53 +19,64 @@ import {
 // "National register detail" is imported from one of Uzbekistan's two national
 // registers — `register` says which — and is optional: a self-registered lab
 // has none of it.
+/**
+ * A register record, as the API actually sends it.
+ *
+ * Only the first block is always present. Everything after it is what a
+ * membership buys, and the API omits those fields entirely for a viewer who is
+ * not entitled to them — so they are optional here, and TypeScript makes every
+ * read of one be guarded.
+ *
+ * This page is rendered on the server, which has no token, so in practice it
+ * *always* receives the short record. It used to declare every field as
+ * required and then read `lab.fields.length` straight out, which threw and
+ * turned every laboratory link into a 500. The type lying about the payload is
+ * what let that reach production, so the type now tells the truth.
+ */
 export interface Laboratory {
+  // --- Always present, for everyone -------------------------------------
   id: string;
   name: string;
   slug: string;
-  fields: string[];
   accreditationNumber: string | null;
-  accreditationBody: string | null;
-  accreditationStatus: string;
-  accreditedUntil: string | null;
-  taxId: string | null;
   region: string | null;
   city: string | null;
   address: string | null;
-  phone: string | null;
-  email: string | null;
-  website: string | null;
-  description: string | null;
-  isUzLabMember: boolean;
-  /**
-   * LaboratorySource — how the record got here. "SELF_REGISTERED" means a
-   * member added it because it is in neither national register, so nothing on
-   * this page has been checked against an official source.
-   */
   source: string;
-
   register: string | null;
+  bodyType: string | null;
+
+  // --- Members only; absent from the payload otherwise ------------------
+  fields?: string[];
+  accreditationBody?: string | null;
+  accreditationStatus?: string;
+  accreditedUntil?: string | null;
+  taxId?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  website?: string | null;
+  description?: string | null;
+  isUzLabMember?: boolean;
   /**
    * When this particular record was last found in its register. More precise
    * than the register-wide verification time: a run can confirm the register as
    * a whole while this entry has not been listed for a while.
    */
-  lastSeenAt: string | null;
-  registerStatusLabel: string | null;
-  bodyType: string | null;
-  bodyTypeLabel: string | null;
-  isLaboratory: boolean;
-  legalEntityName: string | null;
-  legalEntityAddress: string | null;
-  supervisorName: string | null;
-  standard: string | null;
-  accreditationDate: string | null;
-  reAccreditationDate: string | null;
-  statusDate: string | null;
-  certificateUrl: string | null;
-  scopeUrl: string | null;
-  scopeText: string | null;
-  directions: string[];
+  lastSeenAt?: string | null;
+  registerStatusLabel?: string | null;
+  bodyTypeLabel?: string | null;
+  isLaboratory?: boolean;
+  legalEntityName?: string | null;
+  legalEntityAddress?: string | null;
+  supervisorName?: string | null;
+  standard?: string | null;
+  accreditationDate?: string | null;
+  reAccreditationDate?: string | null;
+  statusDate?: string | null;
+  certificateUrl?: string | null;
+  scopeUrl?: string | null;
+  scopeText?: string | null;
+  directions?: string[];
 
   /**
    * PDFs the laboratory uploaded itself when its entry was submitted, stored by
@@ -77,7 +88,7 @@ export interface Laboratory {
   // Supplementary detail supplied by the laboratory itself, once a member's
   // claim has been approved. Null while nobody has filled it in. It is shown
   // alongside the register's data, never in place of it.
-  profile: LaboratoryProfile | null;
+  profile?: LaboratoryProfile | null;
 }
 
 type L10n = Record<Lang, string>;
@@ -408,9 +419,19 @@ export function LaboratoryDetailView({ lab }: { lab: Laboratory }) {
   const { lang } = useLang();
   const t = <K extends keyof typeof T>(key: K) => pick(T[key], lang);
 
-  const statusEntry = STATUS_LABELS[lab.accreditationStatus];
-  const status = statusEntry ? pick(statusEntry, lang) : lab.accreditationStatus;
-  const statusColor = STATUS_COLORS[lab.accreditationStatus] ?? STATUS_COLORS.UNKNOWN;
+  // Accreditation status is one of the fields a membership buys, so a
+  // non-member gets no status at all — not an "unknown" one. The chip is
+  // simply not drawn rather than showing a grey badge that implies we looked
+  // and could not tell.
+  const statusEntry = lab.accreditationStatus
+    ? STATUS_LABELS[lab.accreditationStatus]
+    : undefined;
+  const status = statusEntry
+    ? pick(statusEntry, lang)
+    : (lab.accreditationStatus ?? null);
+  const statusColor =
+    (lab.accreditationStatus ? STATUS_COLORS[lab.accreditationStatus] : undefined) ??
+    STATUS_COLORS.UNKNOWN;
   const bodyTypeEntry = lab.bodyType ? BODY_TYPE_LABELS[lab.bodyType] : undefined;
   const bodyType = bodyTypeEntry ? pick(bodyTypeEntry, lang) : null;
   const registerEntry = lab.register ? REGISTER_LABELS[lab.register] : undefined;
@@ -585,12 +606,14 @@ export function LaboratoryDetailView({ lab }: { lab: Laboratory }) {
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-        <span
-          className="rounded-full px-2.5 py-1 font-semibold uppercase tracking-wide"
-          style={{ background: statusColor.bg, color: statusColor.fg }}
-        >
-          {status}
-        </span>
+        {status && (
+          <span
+            className="rounded-full px-2.5 py-1 font-semibold uppercase tracking-wide"
+            style={{ background: statusColor.bg, color: statusColor.fg }}
+          >
+            {status}
+          </span>
+        )}
         {bodyType && (
           <span
             className="rounded-full px-2.5 py-1 font-medium"
@@ -629,9 +652,9 @@ export function LaboratoryDetailView({ lab }: { lab: Laboratory }) {
         </div>
       )}
 
-      {lab.fields.length > 0 && (
+      {(lab.fields?.length ?? 0) > 0 && (
         <div className="mt-4 flex flex-wrap gap-2">
-          {lab.fields.map((f) => (
+          {lab.fields?.map((f) => (
             <span
               key={f}
               className="rounded-full px-3 py-1 text-xs font-medium"
@@ -654,7 +677,7 @@ export function LaboratoryDetailView({ lab }: { lab: Laboratory }) {
       {/* Directly after the accreditation data it qualifies: a reader deciding
           whether to trust the status needs to know how recently we saw it. */}
       {fromRegister && lab.register && (
-        <RecordProvenance register={lab.register} lastSeenAt={lab.lastSeenAt} />
+        <RecordProvenance register={lab.register} lastSeenAt={lab.lastSeenAt ?? null} />
       )}
 
       <Section title={t("sectionOrganisation")} rows={organisationRows} />
@@ -742,7 +765,7 @@ export function LaboratoryDetailView({ lab }: { lab: Laboratory }) {
         </section>
       )}
 
-      {lab.directions.length > 0 && (
+      {(lab.directions?.length ?? 0) > 0 && (
         <section className="mt-10 pt-8" style={{ borderTop: "1px solid var(--uz-border)" }}>
           <h2
             className="text-xs font-semibold uppercase tracking-wider"
@@ -752,7 +775,7 @@ export function LaboratoryDetailView({ lab }: { lab: Laboratory }) {
           </h2>
           <div className="mt-4 flex flex-wrap gap-2">
             {/* Register wording — rendered verbatim in whatever language it arrives. */}
-            {lab.directions.map((d) => (
+            {lab.directions?.map((d) => (
               <span
                 key={d}
                 className="rounded-full px-3 py-1 text-xs font-medium"

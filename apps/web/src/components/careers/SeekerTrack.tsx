@@ -9,6 +9,7 @@ import { CandidateProfileForm } from "./CandidateProfileForm";
 import {
   CAREERS_PATH,
   EMPLOYMENT_LABELS,
+  EMPLOYMENT_TYPES,
   toSearchParams,
   type EmploymentType,
   type Vacancy,
@@ -145,11 +146,22 @@ export function SeekerTrack() {
           style={controlStyle}
         >
           <option value="">{pick(T.allTypes, lang)}</option>
-          {facets?.employmentTypes.map((t) => (
-            <option key={t.value} value={t.value}>
-              {pick(EMPLOYMENT_LABELS[t.value], lang)} ({formatNumber(t.count, lang)})
-            </option>
-          ))}
+          {/* Every type, always — not only the ones with a vacancy today.
+              Driving this from the facets alone left the dropdown empty while
+              the employer form next to it offered four, which reads as a
+              broken filter rather than as an empty board. The count still
+              comes from the facets, and is left off when it is zero rather
+              than printed as "(0)" against every line. */}
+          {EMPLOYMENT_TYPES.map((value) => {
+            const count =
+              facets?.employmentTypes.find((t) => t.value === value)?.count ?? 0;
+            return (
+              <option key={value} value={value}>
+                {pick(EMPLOYMENT_LABELS[value], lang)}
+                {count > 0 ? ` (${formatNumber(count, lang)})` : ""}
+              </option>
+            );
+          })}
         </select>
       </div>
 

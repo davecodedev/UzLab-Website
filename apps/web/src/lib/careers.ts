@@ -78,6 +78,21 @@ export interface MyApplication {
 
 type L10n = Record<Lang, string>;
 
+/**
+ * Every employment type, in the order the employer form offers them.
+ *
+ * The filter used to be built purely from the API's facets, which list only
+ * the types that currently have a vacancy — so with nothing posted the
+ * dropdown held one entry, "any", while the posting form beside it offered
+ * four. That reads as a broken filter rather than as an empty board.
+ */
+export const EMPLOYMENT_TYPES: EmploymentType[] = [
+  'FULL_TIME',
+  'PART_TIME',
+  'CONTRACT',
+  'INTERNSHIP',
+];
+
 export const EMPLOYMENT_LABELS: Record<EmploymentType, L10n> = {
   FULL_TIME: { ru: "Полная занятость", uz: "To'liq bandlik", en: "Full-time" },
   PART_TIME: { ru: "Частичная занятость", uz: "Qisman bandlik", en: "Part-time" },
